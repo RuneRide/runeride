@@ -1,6 +1,6 @@
 import { FOND_DE_CARTE, CENTRE_DEFAUT, ZOOM_DEFAUT } from './config.js';
 
-const COULEURS = ['#f5a524', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#06b6d4'];
+const COULEURS = ['#C6934B', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#06b6d4'];
 const ACTIF = '#ef4444';
 
 /** Crée une carte Leaflet dans `conteneur`. Leaflet est chargé par <script defer> : on attend `load` au besoin. */
@@ -46,7 +46,7 @@ export function dessinerTrajets(carte, trajets, { onClic } = {}) {
   return { polylignes, ajuster, activer };
 }
 
-export function marqueur(carte, [lat, lon], texte, couleur = '#f5a524') {
+export function marqueur(carte, [lat, lon], texte, couleur = '#C6934B') {
   const L = window.L;
   return L.circleMarker([lat, lon], { radius: 8, color: '#fff', weight: 2, fillColor: couleur, fillOpacity: 1 }).addTo(carte).bindTooltip(texte);
 }
