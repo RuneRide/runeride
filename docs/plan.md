@@ -7,10 +7,10 @@ Dépôt neuf, inspiré de l'existant (Bike360 / `insta-build`, NomadRide), rien 
 1. **Socle PHP** : structure `web/` (`public/`, `src/`), Composer, configuration par variables d'environnement, déploiement o2switch (cPanel, PHP 8.x, MariaDB).
 2. **Vitrine** : reprise de `site/` de Bike360 sous le nom RuneRide (CGV, mentions légales, confidentialité, guide d'import Insta360).
 3. **Comptes et API** (fait : inscription, connexion, JWT RS256, JWKS, /api/moi ; reste : Google, mot de passe oublié, suppression) (décidé : MariaDB sur o2switch = source de vérité) : inscription, connexion, mot de passe oublié, suppression de compte, connexion Google ; émission de JWT RS256 et publication des clés (JWKS) vérifiées par le cloud AWS.
-4. **Trajets GeoRide et ravitaillement** : portage de NomadRide (carte des trajets gratuite, historique récent ; historique complet et arrêts carburant aux abonnés).
+4. **Trajets GeoRide et ravitaillement** (fait côté API : migrations 003-007, synchro GeoRide, trajets, tracés, arrêts carburant France, palier gratuit/abonné ; reste : PWA, carte, autres pays, préférences, enrichissement des marques) : portage de NomadRide (carte des trajets gratuite, historique récent ; historique complet et arrêts carburant aux abonnés).
 5. **Passerelle vers le cloud** : lien du compte vers `runeride-cloud`, palier d'abonnement lu côté baseline.
 
 ## Points à trancher
 
-- Durée de l'historique gratuit des trajets (30 jours proposés).
+- Durée de l'historique gratuit des trajets (30 jours par défaut, réglable par `RUNERIDE_FREE_HISTORY_DAYS` en attendant la décision).
 - Règle de l'essai et conditions d'usage commercial d'OpenStreetMap/CARTO.

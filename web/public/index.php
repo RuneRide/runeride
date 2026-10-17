@@ -32,6 +32,8 @@ $router->add('GET', '/api/moi', function () use ($jwt, $config) {
     return $user === null ? [404, ['erreur' => 'compte introuvable']] : [200, $user];
 });
 
+(require __DIR__ . '/../src/Trips/routes.php')($router, $config, $jwt); // trajets GeoRide, motos, ravitaillement
+
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 [$status, $out] = $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $path);
 

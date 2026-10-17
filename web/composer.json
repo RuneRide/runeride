@@ -6,7 +6,9 @@
     "require": {
         "php": ">=8.3",
         "ext-pdo": "*",
-        "ext-openssl": "*"
+        "ext-curl": "*",
+        "ext-openssl": "*",
+        "ext-sodium": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.0"
