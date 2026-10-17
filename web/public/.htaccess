@@ -2,7 +2,15 @@
 # Page d'accueil statique de la vitrine, puis point d'entrée de l'API
 DirectoryIndex index.html index.php
 
+# Types MIME de la PWA (au cas où le serveur ne les connaît pas)
+AddType application/manifest+json .webmanifest
+AddType text/javascript .js
+
 RewriteEngine On
+
+# Interface web (PWA statique) : jamais envoyée vers index.php, y compris /app/ (répertoire)
+RewriteRule ^app(/|$) - [L]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.php [L]
 
