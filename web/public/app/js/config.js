@@ -16,7 +16,7 @@ export const FOND_DE_CARTE = {
 export const CENTRE_DEFAUT = [46.6, 2.5];
 export const ZOOM_DEFAUT = 5;
 
-// Où envoyer quelqu'un qui doit s'abonner (tarifs de la vitrine).
-export const URL_ABONNEMENT = '/#tarifs';
+// Où envoyer quelqu'un qui doit s'abonner (tarifs du site vitrine, sur un autre domaine).
+export const URL_ABONNEMENT = 'https://runeride.fr/tarifs/';
 
 export const CLE_JETON = 'runeride.jeton';

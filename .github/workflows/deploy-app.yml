@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: EUPL-1.2
+# Teste puis déploie l'application (PWA + API PHP) vers app.runeride.fr sur o2switch, par FTPS.
+# Secrets du dépôt, créés par ops/app-setup.sh : FTP_SERVER, FTP_USERNAME, FTP_PASSWORD.
+# Jamais déployés : .env, storage/ (clé JWT), tests. Ils sont créés une fois sur le serveur (ops/app-provision.sh).
+name: Déploiement app.runeride.fr
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/deploy-app.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-app
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@2.31.1
+        with:
+          php-version: '8.3'
+          extensions: pdo, curl, openssl, sodium
+          tools: composer:v2
+      - run: composer install --prefer-dist --no-progress
+      - name: Tests (ceux qui demandent MariaDB sont ignorés sans RUNERIDE_TEST_DSN)
+        run: vendor/bin/phpunit
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      HAS_FTP: ${{ secrets.FTP_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secrets FTP absents
+        if: env.HAS_FTP != 'true'
+        run: |
+          echo "::warning::Secrets FTP_SERVER, FTP_USERNAME et FTP_PASSWORD absents. Lancer ops/app-setup.sh. Rien n'a été déployé."
+      - uses: shivammathur/setup-php@2.31.1
+        if: env.HAS_FTP == 'true'
+        with:
+          php-version: '8.3'
+          extensions: pdo, curl, openssl, sodium
+          tools: composer:v2
+      - name: Dépendances de production
+        if: env.HAS_FTP == 'true'
+        working-directory: web
+        run: composer install --no-dev --optimize-autoloader --prefer-dist --no-progress
+      - name: Synchroniser par FTPS
+        if: env.HAS_FTP == 'true'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          server-dir: ./
+          local-dir: ./web/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .env
+            .env.example
+            storage/**
+            tests/**
+            phpunit.xml
+            .phpunit.result.cache
+            composer.lock
+            public/index.html
+            public/cgv.html
+            public/confidentialite.html
+            public/mentions-legales.html
+            public/importer-insta360.html
+            public/site.css
+            public/montage.jpg
+            public/reperer-couper.jpg
