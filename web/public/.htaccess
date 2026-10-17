@@ -1,0 +1,4 @@
+# o2switch (Apache) : tout passe par index.php sauf les fichiers existants
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]

@@ -1,3 +1,5 @@
 vendor/
 .env
 *.log
+web/vendor/
+web/.env
