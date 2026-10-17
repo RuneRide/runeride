@@ -15,3 +15,7 @@ Dépôt neuf, inspiré de l'existant (Bike360 / `insta-build`, NomadRide), rien 
 - Durée de l'historique gratuit des trajets (30 jours par défaut, réglable par `RUNERIDE_FREE_HISTORY_DAYS` en attendant la décision).
 - Règle de l'essai et conditions d'usage commercial des tuiles de carte : l'interface utilise les tuiles OpenStreetMap (usage modéré seulement) ; les tuiles CARTO de NomadRide affichent « API KEY REQUIRED » et sont écartées. Avant la prod payante : fournisseur sous contrat ou tuiles hébergées (constante `FOND_DE_CARTE` dans `web/public/app/js/config.js`).
 - Liens de la vitrine sans cible : `/ui/compte.html` (11 occurrences), `/ui/envoi.html`, `/ui/bibliotheque.html`. `/app/` couvre déjà connexion/inscription : à rediriger ou à réécrire.
+
+## Carto
+
+Les outils OSM et le PoC de tuiles PMTiles ont été déplacés vers le dépôt `runeride-carto` (voir son `docs/plan.md`).
