@@ -3,14 +3,15 @@ declare(strict_types=1);
 
 namespace RuneRide\Trips;
 
-use PDO;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Query\QueryBuilder;
 
 /** Tout le SQL des trajets : syntaxe commune MariaDB/PostgreSQL, horodatages UTC générés en PHP. */
 final class TripRepository
 {
-    private const SUMMARY = 'id, georide_trip_id, tracker_id, title, started_at, ended_at, distance_km, duration_min, points_count';
+    private const SUMMARY = ['id', 'georide_trip_id', 'tracker_id', 'title', 'started_at', 'ended_at', 'distance_km', 'duration_min', 'points_count'];
 
-    public function __construct(private readonly PDO $pdo) {}
+    public function __construct(private readonly Connection $db) {}
 
     /**
      * Crée ou met à jour le trajet (clé : utilisateur + identifiant GeoRide). Retourne true s'il est nouveau.
@@ -19,83 +20,92 @@ final class TripRepository
     public function upsert(int $userId, array $t): bool
     {
         $now = Time::now();
-        $path = json_encode($t['path'], JSON_THROW_ON_ERROR);
-        $st = $this->pdo->prepare('SELECT id FROM trips WHERE user_id = ? AND georide_trip_id = ?');
-        $st->execute([$userId, $t['georide_trip_id']]);
-        $id = $st->fetchColumn();
+        $champs = [
+            'tracker_id' => $t['tracker_id'], 'title' => $t['title'], 'started_at' => $t['started_at'], 'ended_at' => $t['ended_at'],
+            'distance_km' => $t['distance_km'], 'duration_min' => $t['duration_min'], 'points_count' => count($t['path']),
+            'path_json' => json_encode($t['path'], JSON_THROW_ON_ERROR),
+        ];
+        $id = $this->db->createQueryBuilder()
+            ->select('id')->from('trips')
+            ->where('user_id = :user', 'georide_trip_id = :trajet')
+            ->setParameter('user', $userId)->setParameter('trajet', $t['georide_trip_id'])
+            ->executeQuery()->fetchOne();
         if ($id === false) {
-            $this->pdo->prepare('INSERT INTO trips (user_id, georide_trip_id, tracker_id, title, started_at, ended_at, distance_km, duration_min, points_count, path_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-                ->execute([$userId, $t['georide_trip_id'], $t['tracker_id'], $t['title'], $t['started_at'], $t['ended_at'], $t['distance_km'], $t['duration_min'], count($t['path']), $path, $now, $now]);
+            $this->db->insert('trips', ['user_id' => $userId, 'georide_trip_id' => $t['georide_trip_id']] + $champs + ['created_at' => $now, 'updated_at' => $now]);
             return true;
         }
-        $this->pdo->prepare('UPDATE trips SET tracker_id = ?, title = ?, started_at = ?, ended_at = ?, distance_km = ?, duration_min = ?, points_count = ?, path_json = ?, updated_at = ? WHERE id = ?')
-            ->execute([$t['tracker_id'], $t['title'], $t['started_at'], $t['ended_at'], $t['distance_km'], $t['duration_min'], count($t['path']), $path, $now, $id]);
+        $this->db->update('trips', $champs + ['updated_at' => $now], ['id' => $id]);
         return false;
     }
 
     /** @return array<string,mixed>|null résumé (sans tracé) */
     public function findByGeorideId(int $userId, string $georideTripId): ?array
     {
-        $st = $this->pdo->prepare('SELECT ' . self::SUMMARY . ' FROM trips WHERE user_id = ? AND georide_trip_id = ?');
-        $st->execute([$userId, $georideTripId]);
-        return $st->fetch() ?: null;
+        return $this->db->createQueryBuilder()
+            ->select(...self::SUMMARY)->from('trips')
+            ->where('user_id = :user', 'georide_trip_id = :trajet')
+            ->setParameter('user', $userId)->setParameter('trajet', $georideTripId)
+            ->executeQuery()->fetchAssociative() ?: null;
     }
 
     /** @return array<string,mixed>|null trajet avec son tracé ('path') */
     public function find(int $userId, int $id): ?array
     {
-        $st = $this->pdo->prepare('SELECT ' . self::SUMMARY . ', path_json FROM trips WHERE user_id = ? AND id = ?');
-        $st->execute([$userId, $id]);
-        $row = $st->fetch();
+        $row = $this->db->createQueryBuilder()
+            ->select(...self::SUMMARY)->addSelect('path_json')->from('trips')
+            ->where('user_id = :user', 'id = :id')
+            ->setParameter('user', $userId)->setParameter('id', $id)
+            ->executeQuery()->fetchAssociative();
         return $row ? self::withPath($row) : null;
     }
 
     /** @return list<array<string,mixed>> résumés, du plus récent au plus ancien */
     public function list(int $userId, ?string $since, int $limit, int $offset = 0): array
     {
-        [$where, $args] = $this->filter($userId, $since);
-        $st = $this->pdo->prepare('SELECT ' . self::SUMMARY . " FROM trips WHERE $where ORDER BY started_at DESC, id DESC LIMIT " . max(1, $limit) . ' OFFSET ' . max(0, $offset));
-        $st->execute($args);
-        return $st->fetchAll();
+        return $this->filtered($this->db->createQueryBuilder()->select(...self::SUMMARY), $userId, $since)
+            ->setMaxResults(max(1, $limit))->setFirstResult(max(0, $offset))
+            ->executeQuery()->fetchAllAssociative();
     }
 
     public function count(int $userId, ?string $since): int
     {
-        [$where, $args] = $this->filter($userId, $since);
-        $st = $this->pdo->prepare("SELECT COUNT(*) FROM trips WHERE $where");
-        $st->execute($args);
-        return (int) $st->fetchColumn();
+        return (int) $this->filtered($this->db->createQueryBuilder()->select('COUNT(*)'), $userId, $since)
+            ->resetOrderBy()->executeQuery()->fetchOne();
     }
 
     /** @return list<array<string,mixed>> trajets avec tracé, pour la carte */
     public function listWithPaths(int $userId, ?string $since, int $limit): array
     {
-        [$where, $args] = $this->filter($userId, $since);
-        $st = $this->pdo->prepare('SELECT ' . self::SUMMARY . ", path_json FROM trips WHERE $where ORDER BY started_at DESC, id DESC LIMIT " . max(1, $limit));
-        $st->execute($args);
-        return array_map(self::withPath(...), $st->fetchAll());
+        $rows = $this->filtered($this->db->createQueryBuilder()->select(...self::SUMMARY)->addSelect('path_json'), $userId, $since)
+            ->setMaxResults(max(1, $limit))
+            ->executeQuery()->fetchAllAssociative();
+        return array_map(self::withPath(...), $rows);
     }
 
     /** Début du plus ancien trajet au tracé douteux (2 points ou moins), pour le rattrapage. */
     public function oldestDoubtfulStart(int $userId): ?string
     {
-        $st = $this->pdo->prepare('SELECT MIN(started_at) FROM trips WHERE user_id = ? AND points_count <= 2');
-        $st->execute([$userId]);
-        $v = $st->fetchColumn();
+        $v = $this->db->createQueryBuilder()
+            ->select('MIN(started_at)')->from('trips')
+            ->where('user_id = :user', 'points_count <= 2')->setParameter('user', $userId)
+            ->executeQuery()->fetchOne();
         return $v === false || $v === null ? null : (string) $v;
     }
 
     public function deleteAll(int $userId): int
     {
-        $st = $this->pdo->prepare('DELETE FROM trips WHERE user_id = ?');
-        $st->execute([$userId]);
-        return $st->rowCount();
+        return (int) $this->db->delete('trips', ['user_id' => $userId]);
     }
 
-    /** @return array{0:string,1:list<mixed>} */
-    private function filter(int $userId, ?string $since): array
+    /** Filtre commun (compte, et trajets depuis $since) et tri du plus récent au plus ancien ; valeurs toujours en paramètres. */
+    private function filtered(QueryBuilder $qb, int $userId, ?string $since): QueryBuilder
     {
-        return $since === null ? ['user_id = ?', [$userId]] : ['user_id = ? AND started_at >= ?', [$userId, $since]];
+        $qb->from('trips')->where('user_id = :user')->setParameter('user', $userId)
+            ->orderBy('started_at', 'DESC')->addOrderBy('id', 'DESC');
+        if ($since !== null) {
+            $qb->andWhere('started_at >= :depuis')->setParameter('depuis', $since);
+        }
+        return $qb;
     }
 
     /** @param array<string,mixed> $row @return array<string,mixed> */

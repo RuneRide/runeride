@@ -10,6 +10,10 @@ Dépôt neuf, inspiré de l'existant (Bike360 / `insta-build`, NomadRide), rien 
 4. **Trajets GeoRide et ravitaillement** (fait côté API : migrations 003-007, synchro GeoRide, trajets, tracés, arrêts carburant France, palier gratuit/abonné ; fait côté interface : `web/public/app/`, PWA sans étape de build (connexion/inscription, liste et carte Leaflet 1.9.4, détail, GeoRide, synchronisation, pit-stop, service worker, manifeste, icônes RuneRide) ; reste : autres pays, préférences, enrichissement des marques, test sur iPhone/Android réels) : portage de NomadRide (carte des trajets gratuite, historique récent ; historique complet et arrêts carburant aux abonnés).
 5. **Passerelle vers le cloud** : lien du compte vers `runeride-cloud`, palier d'abonnement lu côté baseline.
 
+## Accès SQL : Doctrine DBAL (adopté)
+
+Tout l'accès aux données passe par `doctrine/dbal` ^4.4 (comme `runeride-carto`) : `Database::connect()` renvoie une `Connection` paresseuse construite depuis le DSN PDO du `.env` (MariaDB `pdo_mysql`, PostgreSQL `pdo_pgsql`), les dépôts (`Auth/`, `Trips/`, `Fuel/`) utilisent le QueryBuilder et `insert`/`update`/`delete`, `LIMIT`/`OFFSET` passent par `setMaxResults`/`setFirstResult`, et les remplacements de stations par lots sont un `INSERT` multi-lignes à paramètres nommés générés (valeurs toujours liées, noms de colonnes constants). Les migrations gardent le format `migrations/<pilote>/*.sql` et la table `migrations` (une instruction par fichier). Horodatages toujours générés en PHP.
+
 ## Points à trancher
 
 - Durée de l'historique gratuit des trajets (30 jours par défaut, réglable par `RUNERIDE_FREE_HISTORY_DAYS` en attendant la décision).

@@ -2,6 +2,6 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/../vendor/autoload.php';
-$pdo = RuneRide\Database::connect(RuneRide\Config::load(__DIR__ . '/../.env'));
-$done = RuneRide\Database::migrate($pdo, __DIR__ . '/../migrations');
+$db = RuneRide\Database::connect(RuneRide\Config::load(__DIR__ . '/../.env'));
+$done = RuneRide\Database::migrate($db, __DIR__ . '/../migrations');
 echo $done ? "Migrations jouées : " . implode(', ', $done) . "\n" : "Rien à migrer.\n";

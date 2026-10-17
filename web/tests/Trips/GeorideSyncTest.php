@@ -29,8 +29,8 @@ final class GeorideSyncTest extends DbTestCase
             ->on('GET /tracker/7/trips/positions', F::json([['latitude' => 48.0, 'longitude' => 2.0], ['latitude' => 48.05, 'longitude' => 2.05], ['latitude' => 48.1, 'longitude' => 2.1]]));
         $client = new GeorideClient($this->http, 'https://stub.test');
         $vault = new TokenVault(TokenVault::generateKey());
-        $this->accounts = new GeorideAccountRepository($this->pdo);
-        $this->trips = new TripRepository($this->pdo);
+        $this->accounts = new GeorideAccountRepository($this->db);
+        $this->trips = new TripRepository($this->db);
         $this->sync = new GeorideSync($client, $this->accounts, $this->trips, $vault, function (): void {});
         $this->accounts->save($this->uid, 'g@x.fr', $vault->encrypt('mdp-georide'), null);
         $this->accounts->syncTrackers($this->uid, ['7' => 'Duke', '8' => 'CRF']);

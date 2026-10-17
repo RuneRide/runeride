@@ -17,7 +17,7 @@ final class RepositoriesTest extends DbTestCase
     public function testSubscriptionDefaultsToFreeAndCanChange(): void
     {
         $u = $this->makeUser();
-        $r = new SubscriptionRepository($this->pdo);
+        $r = new SubscriptionRepository($this->db);
         $this->assertSame('gratuit', $r->tierOf($u));
         $r->setTier($u, 'abonne');
         $this->assertSame('abonne', $r->tierOf($u));
@@ -29,7 +29,7 @@ final class RepositoriesTest extends DbTestCase
     {
         $a = $this->makeUser('a@x.fr');
         $b = $this->makeUser('b@x.fr');
-        $r = new TripRepository($this->pdo);
+        $r = new TripRepository($this->db);
         $this->assertTrue($r->upsert($a, $this->trip('g1', '2026-05-01 10:00:00')));
         $this->assertFalse($r->upsert($a, ['title' => 'Renommé'] + $this->trip('g1', '2026-05-01 10:00:00')));
         $r->upsert($a, $this->trip('g2', '2026-06-01 10:00:00', [[1.0, 2.0]]));
@@ -52,7 +52,7 @@ final class RepositoriesTest extends DbTestCase
     public function testGeorideAccountAndTrackers(): void
     {
         $u = $this->makeUser();
-        $r = new GeorideAccountRepository($this->pdo);
+        $r = new GeorideAccountRepository($this->db);
         $this->assertNull($r->find($u));
         $r->save($u, 'g@x.fr', 'CHIFFRE', '2026-01-01 00:00:00');
         $r->save($u, 'g2@x.fr', 'CHIFFRE2', '2030-01-01 00:00:00');
@@ -75,8 +75,8 @@ final class RepositoriesTest extends DbTestCase
     public function testDeletingAccountCascades(): void
     {
         $u = $this->makeUser();
-        (new TripRepository($this->pdo))->upsert($u, $this->trip('g1', '2026-05-01 10:00:00'));
-        (new GeorideAccountRepository($this->pdo))->save($u, 'g@x.fr', 'c', null);
+        (new TripRepository($this->db))->upsert($u, $this->trip('g1', '2026-05-01 10:00:00'));
+        (new GeorideAccountRepository($this->db))->save($u, 'g@x.fr', 'c', null);
         $this->pdo->exec('DELETE FROM users');
         $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM trips')->fetchColumn());
         $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM georide_accounts')->fetchColumn());

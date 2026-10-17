@@ -22,12 +22,12 @@ final class TripsApiTest extends DbTestCase
             ->on('GET /user/trackers', F::json([['trackerId' => 7, 'trackerName' => 'Duke']]))
             ->on('GET /prix', F::json([['id' => 1, 'latitude' => 48.86, 'longitude' => 2.33, 'sp95_prix' => 1.8, 'sp95_maj' => gmdate('c')]]));
         $client = new GeorideClient($this->http, 'https://stub.test');
-        $acc = new GeorideAccountRepository($this->pdo);
-        $trips = new TripRepository($this->pdo);
+        $acc = new GeorideAccountRepository($this->db);
+        $trips = new TripRepository($this->db);
         $this->api = new TripsApi(
-            new TripService($trips, new SubscriptionRepository($this->pdo), 30), $trips, $acc, $client,
+            new TripService($trips, new SubscriptionRepository($this->db), 30), $trips, $acc, $client,
             new GeorideSync($client, $acc, $trips, $this->vault, fn () => null), $this->vault,
-            new FuelSearch(new FranceProvider($this->http, new StationRepository($this->pdo), 3600, 'https://stub.test/prix')),
+            new FuelSearch(new FranceProvider($this->http, new StationRepository($this->db), 3600, 'https://stub.test/prix')),
         );
     }
 
@@ -37,7 +37,7 @@ final class TripsApiTest extends DbTestCase
         $this->assertSame(422, $this->api->georideLink($u, ['email' => 'pas-un-mail', 'mot_de_passe' => 'x'])[0]);
         $this->http->on('POST /user/login', F::json([], 401));
         $this->assertSame(422, $this->api->georideLink($u, ['email' => 'g@x.fr', 'mot_de_passe' => 'faux'])[0]);
-        $this->assertNull((new GeorideAccountRepository($this->pdo))->find($u));
+        $this->assertNull((new GeorideAccountRepository($this->db))->find($u));
 
         $this->http->on('POST /user/login', F::json(['authToken' => 'tok']));
         $this->assertSame(200, $this->api->georideLink($u, ['email' => 'g@x.fr', 'mot_de_passe' => 'secret-georide', 'suivi_depuis' => '2026-03-01T00:00:00Z'])[0]);

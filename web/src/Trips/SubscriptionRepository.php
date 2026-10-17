@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace RuneRide\Trips;
 
-use PDO;
+use Doctrine\DBAL\Connection;
 
 /** Palier d'abonnement du compte (colonne users.tier). Le paiement n'est pas géré ici. */
 final class SubscriptionRepository
@@ -11,13 +11,14 @@ final class SubscriptionRepository
     public const FREE = 'gratuit';
     public const SUBSCRIBER = 'abonne';
 
-    public function __construct(private readonly PDO $pdo) {}
+    public function __construct(private readonly Connection $db) {}
 
     public function tierOf(int $userId): string
     {
-        $st = $this->pdo->prepare('SELECT tier FROM users WHERE id = ?');
-        $st->execute([$userId]);
-        $tier = $st->fetchColumn();
+        $tier = $this->db->createQueryBuilder()
+            ->select('tier')->from('users')
+            ->where('id = :id')->setParameter('id', $userId)
+            ->executeQuery()->fetchOne();
         return $tier === self::SUBSCRIBER ? self::SUBSCRIBER : self::FREE;
     }
 
@@ -26,6 +27,6 @@ final class SubscriptionRepository
         if (!in_array($tier, [self::FREE, self::SUBSCRIBER], true)) {
             throw new \InvalidArgumentException("Palier inconnu : $tier");
         }
-        $this->pdo->prepare('UPDATE users SET tier = ? WHERE id = ?')->execute([$tier, $userId]);
+        $this->db->update('users', ['tier' => $tier], ['id' => $userId]);
     }
 }

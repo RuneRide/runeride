@@ -3,55 +3,60 @@ declare(strict_types=1);
 
 namespace RuneRide\Trips;
 
-use PDO;
+use Doctrine\DBAL\Connection;
 
 /** Compte GeoRide lié (mot de passe déjà chiffré par TokenVault) et motos choisies. */
 final class GeorideAccountRepository
 {
-    public function __construct(private readonly PDO $pdo) {}
+    public function __construct(private readonly Connection $db) {}
 
     /** @return array<string,mixed>|null */
     public function find(int $userId): ?array
     {
-        $st = $this->pdo->prepare('SELECT user_id, georide_email, password_enc, tracking_start_at, last_sync_at FROM georide_accounts WHERE user_id = ?');
-        $st->execute([$userId]);
-        return $st->fetch() ?: null;
+        return $this->db->createQueryBuilder()
+            ->select('user_id', 'georide_email', 'password_enc', 'tracking_start_at', 'last_sync_at')->from('georide_accounts')
+            ->where('user_id = :user')->setParameter('user', $userId)
+            ->executeQuery()->fetchAssociative() ?: null;
     }
 
     public function save(int $userId, string $email, string $passwordEnc, ?string $trackingStartAt): void
     {
         $now = Time::now();
         if ($this->find($userId) === null) {
-            $this->pdo->prepare('INSERT INTO georide_accounts (user_id, georide_email, password_enc, tracking_start_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-                ->execute([$userId, $email, $passwordEnc, $trackingStartAt, $now, $now]);
+            $this->db->insert('georide_accounts', [
+                'user_id' => $userId, 'georide_email' => $email, 'password_enc' => $passwordEnc,
+                'tracking_start_at' => $trackingStartAt, 'created_at' => $now, 'updated_at' => $now,
+            ]);
             return;
         }
-        $this->pdo->prepare('UPDATE georide_accounts SET georide_email = ?, password_enc = ?, updated_at = ? WHERE user_id = ?')
-            ->execute([$email, $passwordEnc, $now, $userId]);
+        $this->db->update('georide_accounts', ['georide_email' => $email, 'password_enc' => $passwordEnc, 'updated_at' => $now], ['user_id' => $userId]);
     }
 
     public function touchLastSync(int $userId, string $at): void
     {
-        $this->pdo->prepare('UPDATE georide_accounts SET last_sync_at = ?, updated_at = ? WHERE user_id = ?')->execute([$at, Time::now(), $userId]);
+        $this->db->update('georide_accounts', ['last_sync_at' => $at, 'updated_at' => Time::now()], ['user_id' => $userId]);
     }
 
     public function resetLastSync(int $userId): void
     {
-        $this->pdo->prepare('UPDATE georide_accounts SET last_sync_at = NULL, updated_at = ? WHERE user_id = ?')->execute([Time::now(), $userId]);
+        $this->db->update('georide_accounts', ['last_sync_at' => null, 'updated_at' => Time::now()], ['user_id' => $userId]);
     }
 
     public function delete(int $userId): void
     {
-        $this->pdo->prepare('DELETE FROM georide_trackers WHERE user_id = ?')->execute([$userId]);
-        $this->pdo->prepare('DELETE FROM georide_accounts WHERE user_id = ?')->execute([$userId]);
+        $this->db->delete('georide_trackers', ['user_id' => $userId]);
+        $this->db->delete('georide_accounts', ['user_id' => $userId]);
     }
 
     /** @return list<array{tracker_id:string,name:string,selected:bool}> */
     public function trackers(int $userId): array
     {
-        $st = $this->pdo->prepare('SELECT tracker_id, name, selected FROM georide_trackers WHERE user_id = ? ORDER BY name');
-        $st->execute([$userId]);
-        return array_map(fn ($r) => ['tracker_id' => (string) $r['tracker_id'], 'name' => (string) $r['name'], 'selected' => (int) $r['selected'] === 1], $st->fetchAll());
+        $rows = $this->db->createQueryBuilder()
+            ->select('tracker_id', 'name', 'selected')->from('georide_trackers')
+            ->where('user_id = :user')->setParameter('user', $userId)
+            ->orderBy('name')
+            ->executeQuery()->fetchAllAssociative();
+        return array_map(fn ($r) => ['tracker_id' => (string) $r['tracker_id'], 'name' => (string) $r['name'], 'selected' => (int) $r['selected'] === 1], $rows);
     }
 
     /** Met à jour la liste des motos connues sans toucher à la sélection existante. @param array<string,string> $idToName */
@@ -60,9 +65,9 @@ final class GeorideAccountRepository
         $known = array_column($this->trackers($userId), 'tracker_id');
         foreach ($idToName as $id => $name) {
             if (in_array((string) $id, $known, true)) {
-                $this->pdo->prepare('UPDATE georide_trackers SET name = ? WHERE user_id = ? AND tracker_id = ?')->execute([$name, $userId, (string) $id]);
+                $this->db->update('georide_trackers', ['name' => $name], ['user_id' => $userId, 'tracker_id' => (string) $id]);
             } else {
-                $this->pdo->prepare('INSERT INTO georide_trackers (user_id, tracker_id, name, selected) VALUES (?, ?, ?, 0)')->execute([$userId, (string) $id, $name]);
+                $this->db->insert('georide_trackers', ['user_id' => $userId, 'tracker_id' => (string) $id, 'name' => $name, 'selected' => 0]);
             }
         }
     }
@@ -70,9 +75,9 @@ final class GeorideAccountRepository
     /** @param list<string> $trackerIds */
     public function select(int $userId, array $trackerIds): void
     {
-        $this->pdo->prepare('UPDATE georide_trackers SET selected = 0 WHERE user_id = ?')->execute([$userId]);
+        $this->db->update('georide_trackers', ['selected' => 0], ['user_id' => $userId]);
         foreach ($trackerIds as $id) {
-            $this->pdo->prepare('UPDATE georide_trackers SET selected = 1 WHERE user_id = ? AND tracker_id = ?')->execute([$userId, $id]);
+            $this->db->update('georide_trackers', ['selected' => 1], ['user_id' => $userId, 'tracker_id' => $id]);
         }
     }
 

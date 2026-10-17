@@ -29,7 +29,7 @@ final class RoutesTest extends DbTestCase
             ->on('GET /tracker/7/trips/positions', F::json([['latitude' => 1, 'longitude' => 1], ['latitude' => 2, 'longitude' => 2], ['latitude' => 3, 'longitude' => 3]]));
         $this->router = new Router();
         $config = new Config(['RUNERIDE_GEORIDE_KEY' => $key, 'RUNERIDE_FREE_HISTORY_DAYS' => '10', 'RUNERIDE_GEORIDE_URL' => 'https://stub.test']);
-        (require __DIR__ . '/../../src/Trips/routes.php')($this->router, $config, $this->jwt, $this->http, $this->pdo);
+        (require __DIR__ . '/../../src/Trips/routes.php')($this->router, $config, $this->jwt, $this->http, $this->db);
     }
 
     protected function tearDown(): void
@@ -61,7 +61,7 @@ final class RoutesTest extends DbTestCase
     public function testSyncedTripsAreListedAndDetailed(): void
     {
         $u = $this->makeUser();
-        $repo = new \RuneRide\Trips\GeorideAccountRepository($this->pdo);
+        $repo = new \RuneRide\Trips\GeorideAccountRepository($this->db);
         $repo->save($u, 'g@x.fr', $this->vault->encrypt('pw'), null);
         $this->assertSame(409, $this->call('POST', '/api/georide/synchronisation', $u)[0], 'aucune moto choisie');
         $this->assertSame(['Duke'], array_column($this->call('GET', '/api/georide/motos', $u)[1]['motos'], 'name'));
@@ -92,7 +92,7 @@ final class RoutesTest extends DbTestCase
     {
         $u = $this->makeUser();
         $this->assertSame([403, 'abonnement_requis'], [$this->call('GET', '/api/ravitaillement', $u, ['lat' => '48.8', 'lon' => '2.3'])[0], $this->call('GET', '/api/ravitaillement', $u, ['lat' => '48.8', 'lon' => '2.3'])[1]['code']]);
-        (new SubscriptionRepository($this->pdo))->setTier($u, 'abonne');
+        (new SubscriptionRepository($this->db))->setTier($u, 'abonne');
         $this->assertSame(422, $this->call('GET', '/api/ravitaillement', $u)[0]);
         $this->assertSame(422, $this->call('GET', '/api/ravitaillement', $u, ['lat' => '48.8', 'lon' => '2.3', 'carburant' => 'kerosene'])[0]);
     }

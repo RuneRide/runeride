@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace RuneRide\Tests\Support;
 
+use Doctrine\DBAL\Connection;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use RuneRide\{Config, Database};
@@ -10,7 +11,8 @@ use RuneRide\{Config, Database};
 /** Base de test MariaDB (RUNERIDE_TEST_DSN, _USER, _PASSWORD) ; sinon les tests sont ignorés. */
 abstract class DbTestCase extends TestCase
 {
-    protected PDO $pdo;
+    protected Connection $db;
+    protected PDO $pdo; // même connexion, en natif, pour les requêtes brutes des tests
 
     protected function setUp(): void
     {
@@ -18,8 +20,9 @@ abstract class DbTestCase extends TestCase
         if (!$dsn) {
             $this->markTestSkipped('RUNERIDE_TEST_DSN absent');
         }
-        $this->pdo = Database::connect(new Config(['RUNERIDE_DB_DSN' => $dsn, 'RUNERIDE_DB_USER' => (string) getenv('RUNERIDE_TEST_USER'), 'RUNERIDE_DB_PASSWORD' => (string) getenv('RUNERIDE_TEST_PASSWORD')]));
-        Database::migrate($this->pdo, __DIR__ . '/../../migrations');
+        $this->db = Database::connect(new Config(['RUNERIDE_DB_DSN' => $dsn, 'RUNERIDE_DB_USER' => (string) getenv('RUNERIDE_TEST_USER'), 'RUNERIDE_DB_PASSWORD' => (string) getenv('RUNERIDE_TEST_PASSWORD')]));
+        Database::migrate($this->db, __DIR__ . '/../../migrations');
+        $this->pdo = $this->db->getNativeConnection();
         $this->pdo->exec('DELETE FROM users'); // cascade sur trajets, comptes GeoRide, motos
         $this->pdo->exec('DELETE FROM fuel_stations');
     }

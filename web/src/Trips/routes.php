@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use Doctrine\DBAL\Connection;
 use RuneRide\{Config, Database, Router};
 use RuneRide\Auth\Jwt;
 use RuneRide\Fuel\{FranceProvider, FuelSearch, StationRepository};
@@ -10,17 +11,17 @@ use RuneRide\Trips\{GeorideAccountRepository, GeorideClient, GeorideSync, Subscr
 /**
  * Routes trajets GeoRide, motos, ravitaillement. Usage : (require 'src/Trips/routes.php')($router, $config, $jwt);
  * Toutes exigent un jeton Bearer valide ; la base et les services ne sont créés qu'à la première requête.
- * $http et $pdo servent aux tests.
+ * $http et $db (connexion DBAL) servent aux tests.
  */
-return static function (Router $router, Config $config, Jwt $jwt, ?HttpClient $http = null, ?PDO $pdo = null): void {
-    $api = static function () use ($config, $http, $pdo): TripsApi {
-        $pdo ??= Database::connect($config);
+return static function (Router $router, Config $config, Jwt $jwt, ?HttpClient $http = null, ?Connection $db = null): void {
+    $api = static function () use ($config, $http, $db): TripsApi {
+        $db ??= Database::connect($config);
         $http ??= new CurlHttpClient(15, 5);
         $vault = new TokenVault($config->get('RUNERIDE_GEORIDE_KEY'));
-        $accounts = new GeorideAccountRepository($pdo);
-        $tripRepo = new TripRepository($pdo);
+        $accounts = new GeorideAccountRepository($db);
+        $tripRepo = new TripRepository($db);
         $client = new GeorideClient($http, $config->get('RUNERIDE_GEORIDE_URL', 'https://api.georide.com'));
-        $subs = new SubscriptionRepository($pdo);
+        $subs = new SubscriptionRepository($db);
         return new TripsApi(
             new TripService($tripRepo, $subs, max(1, (int) $config->get('RUNERIDE_FREE_HISTORY_DAYS', '30'))),
             $tripRepo,
@@ -28,7 +29,7 @@ return static function (Router $router, Config $config, Jwt $jwt, ?HttpClient $h
             $client,
             new GeorideSync($client, $accounts, $tripRepo, $vault),
             $vault,
-            new FuelSearch(new FranceProvider($http, new StationRepository($pdo))),
+            new FuelSearch(new FranceProvider($http, new StationRepository($db))),
         );
     };
 

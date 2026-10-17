@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace RuneRide\Tests;
 
+use Doctrine\DBAL\Connection;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use RuneRide\Auth\{AccountService, Jwt, LoginThrottle, UserRepository};
@@ -12,6 +13,7 @@ use RuneRide\{Config, Database};
 final class AccountServiceTest extends TestCase
 {
     private AccountService $svc;
+    private Connection $db;
     private PDO $pdo;
 
     protected function setUp(): void
@@ -20,11 +22,12 @@ final class AccountServiceTest extends TestCase
         if (!$dsn) {
             $this->markTestSkipped('RUNERIDE_TEST_DSN absent');
         }
-        $this->pdo = Database::connect(new Config(['RUNERIDE_DB_DSN' => $dsn, 'RUNERIDE_DB_USER' => (string) getenv('RUNERIDE_TEST_USER'), 'RUNERIDE_DB_PASSWORD' => (string) getenv('RUNERIDE_TEST_PASSWORD')]));
-        Database::migrate($this->pdo, __DIR__ . '/../migrations');
+        $this->db = Database::connect(new Config(['RUNERIDE_DB_DSN' => $dsn, 'RUNERIDE_DB_USER' => (string) getenv('RUNERIDE_TEST_USER'), 'RUNERIDE_DB_PASSWORD' => (string) getenv('RUNERIDE_TEST_PASSWORD')]));
+        Database::migrate($this->db, __DIR__ . '/../migrations');
+        $this->pdo = $this->db->getNativeConnection();
         $this->pdo->exec('DELETE FROM users');
         $this->pdo->exec('DELETE FROM login_attempts');
-        $this->svc = new AccountService(new UserRepository($this->pdo), new Jwt(Jwt::generateKeyPem(), 'i', 'a'), new LoginThrottle($this->pdo, 3));
+        $this->svc = new AccountService(new UserRepository($this->db), new Jwt(Jwt::generateKeyPem(), 'i', 'a'), new LoginThrottle($this->db, 3));
     }
 
     public function testRegisterThenLogin(): void

@@ -35,7 +35,7 @@ final class FuelTest extends DbTestCase
     public function testProviderCachesInDatabaseThenServesFromIt(): void
     {
         $http = (new F())->on('GET /prix', F::json($this->feed()));
-        $p = new FranceProvider($http, new StationRepository($this->pdo), 3600, 'https://stub.test/prix');
+        $p = new FranceProvider($http, new StationRepository($this->db), 3600, 'https://stub.test/prix');
         $this->assertCount(3, $p->around(48.86, 2.33, 10), 'Marseille hors du cercle');
         $this->assertCount(3, $p->around(48.86, 2.33, 10));
         $this->assertSame(1, $http->count('GET /prix'), 'second appel servi par la base');
@@ -44,7 +44,7 @@ final class FuelTest extends DbTestCase
 
     public function testStaleCacheServedWhenFeedFailsButErrorWithoutCache(): void
     {
-        $repo = new StationRepository($this->pdo);
+        $repo = new StationRepository($this->db);
         $failing = (new F())->on('GET /prix', new HttpException('hors ligne'));
         try {
             (new FranceProvider($failing, $repo, 3600, 'https://stub.test/prix'))->around(48.86, 2.33, 10);
@@ -59,7 +59,7 @@ final class FuelTest extends DbTestCase
     public function testSearchRanksByTotalCostAndPutsMissingFuelLast(): void
     {
         $http = (new F())->on('GET /prix', F::json($this->feed()));
-        $search = new FuelSearch(new FranceProvider($http, new StationRepository($this->pdo), 3600, 'https://stub.test/prix'));
+        $search = new FuelSearch(new FranceProvider($http, new StationRepository($this->db), 3600, 'https://stub.test/prix'));
         $r = $search->around(48.86, 2.33, 10, 'sp95', ['fillSize' => 15, 'consumption' => 5, 'excludeDistance' => false]);
         $this->assertSame(['2', '1', '3'], array_column($r, 'id'));
         $this->assertNull($r[2]['prix_litre']);

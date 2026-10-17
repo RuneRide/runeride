@@ -5,10 +5,11 @@
     "license": "EUPL-1.2",
     "require": {
         "php": ">=8.3",
-        "ext-pdo": "*",
         "ext-curl": "*",
         "ext-openssl": "*",
-        "ext-sodium": "*"
+        "ext-pdo": "*",
+        "ext-sodium": "*",
+        "doctrine/dbal": "^4.4"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.0"
