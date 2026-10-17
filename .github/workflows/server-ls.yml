@@ -9,6 +9,9 @@ on:
       path:
         description: "Dossier relatif au compte FTP (~/app)"
         default: "."
+      chmod:
+        description: "Optionnel : commande SITE CHMOD, par exemple « 600 .env »"
+        default: ""
 
 permissions:
   contents: read
@@ -23,6 +26,11 @@ jobs:
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           TARGET: ${{ inputs.path }}
+          CHMOD: ${{ inputs.chmod }}
         run: |
           set -euo pipefail
+          if [ -n "$CHMOD" ]; then
+            printf 'user = "%s:%s"\nssl-reqd\nurl = "ftp://%s/"\nlist-only\nquote = "SITE CHMOD %s"\n' "$FTP_USERNAME" "$FTP_PASSWORD" "$FTP_SERVER" "$CHMOD" | curl -fsS -K - >/dev/null
+            echo "SITE CHMOD $CHMOD exécuté"
+          fi
           printf 'user = "%s:%s"\nssl-reqd\nurl = "ftp://%s/%s/"\nrequest = "LIST -a"\n' "$FTP_USERNAME" "$FTP_PASSWORD" "$FTP_SERVER" "$TARGET" | curl -fsS -K -

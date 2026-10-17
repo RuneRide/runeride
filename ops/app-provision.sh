@@ -61,11 +61,13 @@ prefix=$(basename "$home")   # sur o2switch, le préfixe des bases est le nom du
 DB="${prefix}_${DB_SUFFIX}"; DBUSER="${prefix}_${DBUSER_SUFFIX}"
 
 file_exists() { local r; r=$(uapi Fileman/get_file_information "path=$1" 2>/dev/null || true); jq -e '.status == 1 and ((.data // []) | length) > 0' >/dev/null 2>&1 <<<"$r"; }
+# Les fichiers cachés (.env) ne sont pas vus par get_file_information : on teste la lecture du contenu (rien n'est affiché)
+hidden_exists() { local r; r=$(uapi Fileman/get_file_content "dir=${1%/*}" "file=${1##*/}" 2>/dev/null || true); jq -e '.status == 1 and ((.data.content // "") | length) > 0' >/dev/null 2>&1 <<<"$r"; }
 
 # ============================================================================ Phase 2
 if [[ $MIGRATE -eq 1 ]]; then
   file_exists "$home/$APP_DIR/vendor/autoload.php" || { echo "Le code n'est pas encore déployé (vendor/autoload.php absent). Lancer d'abord le workflow Déploiement app.runeride.fr." >&2; exit 1; }
-  file_exists "$home/$APP_DIR/.env" || { echo ".env absent : lancer d'abord la phase 1 (--apply)." >&2; exit 1; }
+  hidden_exists "$home/$APP_DIR/.env" || { echo ".env absent : lancer d'abord la phase 1 (--apply)." >&2; exit 1; }
   log="storage/migrate.log"
   cmd="cd $home/$APP_DIR && sh -c 'for p in /opt/cpanel/ea-php84/root/usr/bin/php /opt/cpanel/ea-php83/root/usr/bin/php /opt/alt/php84/usr/bin/php /opt/alt/php83/usr/bin/php /usr/local/bin/php /usr/bin/php; do if [ -x \$p ]; then \$p bin/cle-jwt; \$p bin/migrer; echo FIN; exit 0; fi; done; echo AUCUN_PHP' > $log 2>&1"
   echo "== Phase 2 : clé JWT et migrations par tâche cron éphémère =="
@@ -93,7 +95,7 @@ dbs=$(uapi Mysql/list_databases); ok "$dbs" || fail Mysql/list_databases "$dbs"
 users=$(uapi Mysql/list_users); ok "$users" || fail Mysql/list_users "$users"
 db_exists=$(jq -r --arg d "$DB" '[.data[]? | select(.database == $d)] | length' <<<"$dbs")
 dbu_exists=$(jq -r --arg u "$DBUSER" '[.data[]? | select(.user == $u)] | length' <<<"$users")
-env_exists=0; file_exists "$home/$APP_DIR/.env" && env_exists=1
+env_exists=0; hidden_exists "$home/$APP_DIR/.env" && env_exists=1
 need_env=0; [[ "$env_exists" -eq 0 || $FORCE_ENV -eq 1 ]] && need_env=1
 vers=$(uapi LangPHP/php_get_installed_versions 2>/dev/null || true)
 php_pick=$(jq -r '[.data.versions[]? | select(test("^(ea-php|alt-php)(8[3-9]|9[0-9])"))] | sort | last // empty' <<<"$vers" 2>/dev/null || true)
