@@ -102,7 +102,11 @@ echo "== Phase 1 (compte $prefix, dossier $home/$APP_DIR) =="
 echo "base $DB : $([[ "$db_exists" -gt 0 ]] && echo existe || echo absente)"
 echo "utilisateur $DBUSER : $([[ "$dbu_exists" -gt 0 ]] && echo existe || echo absent)"
 echo ".env : $([[ "$env_exists" -gt 0 ]] && echo existe || echo absent)"
-echo "PHP choisi pour $FQDN : ${php_pick:-(aucune version >= 8.3 détectée, à régler dans cPanel > MultiPHP Manager)}"
+php_aucune="(aucune version >= 8.3 détectée par l API ; à régler dans cPanel, sélecteur de version PHP)"
+echo "PHP choisi pour $FQDN : ${php_pick:-$php_aucune}"
+if [[ -z "$php_pick" ]]; then
+  if [[ -n "$vers" ]]; then echo "  réponse de l API LangPHP : $(jq -c '(.data // .errors // .)' <<<"$vers" 2>/dev/null | head -c 300)"; else echo "  l API LangPHP ne répond pas sur ce serveur"; fi
+fi
 echo "== Plan =="
 [[ "$db_exists" -gt 0 ]] || echo "+ création de la base $DB"
 if [[ "$dbu_exists" -eq 0 ]]; then echo "+ création de l'utilisateur $DBUSER"; elif [[ $need_env -eq 1 ]]; then echo "+ nouveau mot de passe de $DBUSER"; fi
