@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: EUPL-1.2
+# Diagnostic : liste un dossier du serveur o2switch par FTPS (fichiers cachés compris), avec le compte de déploiement.
+# Lancer : gh workflow run server-ls.yml --repo RuneRide/runeride -f path=.
+name: Diagnostic serveur (liste FTP)
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: "Dossier relatif au compte FTP (~/app)"
+        default: "."
+
+permissions:
+  contents: read
+
+jobs:
+  ls:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lister
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          TARGET: ${{ inputs.path }}
+        run: |
+          set -euo pipefail
+          printf 'user = "%s:%s"\nssl-reqd\nurl = "ftp://%s/%s/"\nrequest = "LIST -a"\n' "$FTP_USERNAME" "$FTP_PASSWORD" "$FTP_SERVER" "$TARGET" | curl -fsS -K -
