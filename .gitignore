@@ -3,3 +3,4 @@ vendor/
 *.log
 web/vendor/
 web/.env
+web/.phpunit.result.cache
