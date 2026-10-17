@@ -1,6 +1,9 @@
 # o2switch (Apache) : tout passe par index.php sauf les fichiers existants
-# Point d'entrée de l'API ; la vitrine est un site à part (dépôt RuneRide/website)
-DirectoryIndex index.php
+# La vitrine est un site à part (dépôt RuneRide/website)
+# index.html d'abord : /app/ doit servir l'interface ; index.php reste le point d'entrée de l'API
+DirectoryIndex index.html index.php
+Options -Indexes
+AddDefaultCharset UTF-8
 
 # Types MIME de la PWA (au cas où le serveur ne les connaît pas)
 AddType application/manifest+json .webmanifest
