@@ -5,7 +5,7 @@ namespace RuneRide\Tests;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
-use RuneRide\Auth\{AccountService, Jwt, UserRepository};
+use RuneRide\Auth\{AccountService, Jwt, LoginThrottle, UserRepository};
 use RuneRide\{Config, Database};
 
 /** Demande une base de test (RUNERIDE_TEST_DSN, _USER, _PASSWORD) ; sinon ignoré. */
@@ -23,7 +23,8 @@ final class AccountServiceTest extends TestCase
         $this->pdo = Database::connect(new Config(['RUNERIDE_DB_DSN' => $dsn, 'RUNERIDE_DB_USER' => (string) getenv('RUNERIDE_TEST_USER'), 'RUNERIDE_DB_PASSWORD' => (string) getenv('RUNERIDE_TEST_PASSWORD')]));
         Database::migrate($this->pdo, __DIR__ . '/../migrations');
         $this->pdo->exec('DELETE FROM users');
-        $this->svc = new AccountService(new UserRepository($this->pdo), new Jwt(Jwt::generateKeyPem(), 'i', 'a'));
+        $this->pdo->exec('DELETE FROM login_attempts');
+        $this->svc = new AccountService(new UserRepository($this->pdo), new Jwt(Jwt::generateKeyPem(), 'i', 'a'), new LoginThrottle($this->pdo, 3));
     }
 
     public function testRegisterThenLogin(): void
@@ -42,5 +43,15 @@ final class AccountServiceTest extends TestCase
         $this->assertSame(409, $this->svc->register('a@b.fr', 'un-mot-de-passe-long')[0]);
         $this->assertSame(401, $this->svc->login('a@b.fr', 'mauvais-mot-de-passe')[0]);
         $this->assertSame(401, $this->svc->login('inconnu@b.fr', 'un-mot-de-passe-long')[0]);
+    }
+
+    public function testThrottlesRepeatedFailuresAndResetsOnSuccess(): void
+    {
+        $this->svc->register('a@b.fr', 'un-mot-de-passe-long');
+        for ($i = 0; $i < 3; $i++) {
+            $this->assertSame(401, $this->svc->login('a@b.fr', 'mauvais-mot-de-passe', '1.2.3.4')[0]);
+        }
+        $this->assertSame(429, $this->svc->login('a@b.fr', 'un-mot-de-passe-long', '1.2.3.4')[0], 'bloqué même avec le bon mot de passe');
+        $this->assertSame(200, $this->svc->login('a@b.fr', 'un-mot-de-passe-long', '5.6.7.8')[0], 'autre IP non bloquée');
     }
 }

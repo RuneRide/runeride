@@ -19,9 +19,9 @@ $router = new Router();
 $router->add('GET', '/api/sante', fn () => ['statut' => 'ok', 'env' => $config->get('RUNERIDE_ENV', 'production')]);
 $router->add('GET', '/.well-known/jwks.json', fn () => $jwt->jwks());
 
-$accounts = static fn () => new AccountService(new UserRepository(Database::connect($config)), $jwt);
+$accounts = static fn () => (function () use ($config, $jwt) { $pdo = Database::connect($config); return new AccountService(new UserRepository($pdo), $jwt, new RuneRide\Auth\LoginThrottle($pdo)); })();
 $router->add('POST', '/api/inscription', fn () => $accounts()->register((string) ($body['email'] ?? ''), (string) ($body['mot_de_passe'] ?? '')));
-$router->add('POST', '/api/connexion', fn () => $accounts()->login((string) ($body['email'] ?? ''), (string) ($body['mot_de_passe'] ?? '')));
+$router->add('POST', '/api/connexion', fn () => $accounts()->login((string) ($body['email'] ?? ''), (string) ($body['mot_de_passe'] ?? ''), $_SERVER['REMOTE_ADDR'] ?? ''));
 $router->add('GET', '/api/moi', function () use ($jwt, $config) {
     $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     $claims = str_starts_with($auth, 'Bearer ') ? $jwt->verify(substr($auth, 7)) : null;

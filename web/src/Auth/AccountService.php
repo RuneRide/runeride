@@ -5,7 +5,7 @@ namespace RuneRide\Auth;
 
 final class AccountService
 {
-    public function __construct(private readonly UserRepository $users, private readonly Jwt $jwt) {}
+    public function __construct(private readonly UserRepository $users, private readonly Jwt $jwt, private readonly ?LoginThrottle $throttle = null) {}
 
     /** @return array{0:int,1:array<string,mixed>} */
     public function register(string $email, string $password): array
@@ -25,14 +25,20 @@ final class AccountService
     }
 
     /** @return array{0:int,1:array<string,mixed>} */
-    public function login(string $email, string $password): array
+    public function login(string $email, string $password, string $ip = ''): array
     {
+        $key = LoginThrottle::key($email, $ip);
+        if ($this->throttle?->blocked($key)) {
+            return [429, ['erreur' => 'trop de tentatives, réessayez plus tard']];
+        }
         $user = $this->users->findByEmail(mb_strtolower(trim($email)));
         // Même réponse (et même coût) que le compte existe ou non.
         $hash = $user['password_hash'] ?? password_hash('inexistant', PASSWORD_ARGON2ID);
         if (!password_verify($password, $hash) || $user === null) {
+            $this->throttle?->fail($key);
             return [401, ['erreur' => 'identifiants incorrects']];
         }
+        $this->throttle?->clear($key);
         return [200, ['jeton' => $this->jwt->issue((int) $user['id'])]];
     }
 }
