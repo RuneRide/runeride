@@ -21,6 +21,7 @@ final class Router
             $known = array_filter($this->routes, fn ($r) => isset($r[$path]));
             return $known ? [405, ['erreur' => 'méthode non permise']] : [404, ['erreur' => 'introuvable']];
         }
-        return [200, $handler()];
+        $result = $handler();
+        return is_array($result) && array_is_list($result) && count($result) === 2 && is_int($result[0]) ? $result : [200, $result];
     }
 }

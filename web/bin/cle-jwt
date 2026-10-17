@@ -1,0 +1,9 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+require __DIR__ . '/../vendor/autoload.php';
+$file = $argv[1] ?? __DIR__ . '/../storage/jwt-private.pem';
+if (is_file($file)) { fwrite(STDERR, "Existe déjà : $file\n"); exit(1); }
+file_put_contents($file, RuneRide\Auth\Jwt::generateKeyPem());
+chmod($file, 0600);
+echo "Clé créée : $file\n";
