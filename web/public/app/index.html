@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RuneRide — mes trajets</title>
 <meta name="description" content="Vos trajets à moto GeoRide sur une carte, et le ravitaillement le moins cher sur votre route.">
-<meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#17191C" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="preload" href="../fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <link rel="stylesheet" href="app.css">
@@ -17,7 +18,7 @@
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="#/trajets"><span>◉</span> RuneRide</a>
+  <a class="brand" href="#/trajets"><picture><source media="(prefers-color-scheme: light)" srcset="../brand/monogram-mono-dark.svg"><img src="../brand/monogram.svg" alt="" width="26" height="32"></picture><span>Rune<span class="ride">Ride</span></span></a>
   <nav id="nav" hidden>
     <a href="#/trajets" data-route="trajets">Trajets</a>
     <a href="#/ravitaillement" data-route="ravitaillement">Pit-stop</a>

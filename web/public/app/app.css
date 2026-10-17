@@ -1,15 +1,24 @@
+/* Tokens de la charte RuneRide (identity/tokens/tokens.css) : dark-first, aplats mats, bordures 1 px. */
+@font-face { font-family: "Inter"; src: url("../fonts/inter-var.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("../fonts/jetbrains-mono-var.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
 :root {
-  --bg: #f6f4ef; --panel: #fff; --line: #dcd7cb; --text: #1c1e22; --muted: #646a74;
-  --accent: #b8760a; --accent-fond: #f5a524; --sur-accent: #111; --ok: #1a7f52; --err: #b42318; --info: #1d5fa8;
-  color-scheme: light dark;
+  --bg: #17191C; --panel: #212429; --line: #2E323B; --text: #EBE8E0; --muted: #9BA1AB;
+  --accent: #C6934B; --accent-fond: #C6934B; --accent-pressed: #A87938; --sur-accent: #17191C;
+  --ok: #10B981; --err: #EF4444; --info: #6cb2ff;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: dark light;
 }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #111317; --panel: #1a1d23; --line: #2a2f38; --text: #e6e8eb; --muted: #8a919c; --accent: #f5a524; --ok: #3ecf8e; --err: #ff7b72; --info: #6cb2ff; }
+/* Thème clair conservé pour qui le demande : ochre assombri pour le texte (contraste > 4,5:1 sur fond clair). */
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f6f4ef; --panel: #fff; --line: #dcd7cb; --text: #17191C; --muted: #646a74;
+    --accent: #8A5E22; --accent-pressed: #A87938; --ok: #1a7f52; --err: #b42318; --info: #1d5fa8; }
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 var(--font-ui); }
 a { color: var(--accent); }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent-fond); outline-offset: 2px; }
+h1, h2 { font-weight: 600; letter-spacing: -0.01em; }
 h1 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 14px; }
 h2 { font-size: 19px; margin: 18px 0 8px; }
 .muted { color: var(--muted); } .petit { font-size: 13px; }
@@ -17,24 +26,27 @@ h2 { font-size: 19px; margin: 18px 0 8px; }
 header.top { position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   padding: 10px max(16px, env(safe-area-inset-left)); padding-top: max(10px, env(safe-area-inset-top));
   background: var(--panel); border-bottom: 1px solid var(--line); }
-.brand { font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; }
-.brand span { color: var(--accent-fond); }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 20px; letter-spacing: -0.5px; color: var(--text); text-decoration: none; }
+.brand img { display: block; width: 26px; height: 32px; }
+.brand picture { display: block; }
+.brand .ride { color: var(--accent-fond); }
 nav { display: flex; gap: 4px; flex: 1; }
-nav a { white-space: nowrap; color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 8px; font-size: 15px; }
+nav a { display: inline-flex; align-items: center; min-height: 48px; white-space: nowrap; color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 8px; font-size: 15px; }
 nav a.actif { color: var(--text); background: color-mix(in srgb, var(--accent-fond) 22%, transparent); }
 main { max-width: 960px; margin: 0 auto; padding: 18px 16px 48px; outline: none; }
 .etroit { max-width: 420px; margin: 24px auto; }
 
-.btn { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; min-height: 44px; }
+.btn { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; min-height: 48px; }
 .btn:hover:not(:disabled) { border-color: var(--muted); }
-.btn.primaire { background: var(--accent-fond); border-color: var(--accent-fond); color: var(--sur-accent); }
+.btn.primaire { background: var(--accent-fond); border-color: var(--accent-fond); color: var(--sur-accent); min-height: 56px; }
+.btn.primaire:active:not(:disabled) { background: var(--accent-pressed); border-color: var(--accent-pressed); }
 .btn.danger { color: var(--err); }
 .btn:disabled { opacity: .55; cursor: progress; }
 .lien { font: inherit; background: none; border: 0; padding: 6px 0; color: var(--accent); cursor: pointer; text-decoration: underline; }
 
 .carte { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 0 0 16px; }
 .formulaire label { display: block; font-size: 14px; font-weight: 600; margin: 12px 0 4px; }
-.formulaire input:not([type=checkbox]), .formulaire select { width: 100%; font: inherit; padding: 10px; min-height: 44px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.formulaire input:not([type=checkbox]), .formulaire select { width: 100%; font: inherit; padding: 10px; min-height: 48px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
 .formulaire .btn { margin-top: 14px; }
 .grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 14px; }
 .grille .plein { grid-column: 1 / -1; }
@@ -60,6 +72,9 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0 0; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 0 0 16px; }
 .stats div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .stats dt { font-size: 12px; color: var(--muted); } .stats dd { margin: 0; font-weight: 600; }
+/* Télémétrie : chiffres tabulaires, pour que les valeurs ne tremblent pas */
+.stats dd, .droite strong { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.stations li.meilleure .droite strong { color: var(--accent); }
 
 .leaflet-container { font: inherit; }
 @media (max-width: 520px) { nav a { padding: 6px 8px; font-size: 14px; } .droite { text-align: left; margin-left: 0; } }

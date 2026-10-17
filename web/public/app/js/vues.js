@@ -263,7 +263,7 @@ export function vueRavitaillement(racine) {
       r.stations.slice(0, 50).forEach((s, i) => {
         const prix = s.prix_litre === null ? 'prix indisponible' : `${s.prix_litre.toFixed(3)} €/L`;
         const nom = s.marque || s.nom || 'Station';
-        if (carte) { couche.push(marqueur(carte, [s.lat, s.lon], `${nom} · ${prix}`, i < 3 && s.prix_litre !== null ? '#10b981' : '#f5a524')); }
+        if (carte) { couche.push(marqueur(carte, [s.lat, s.lon], `${nom} · ${prix}`, i < 3 && s.prix_litre !== null ? '#C6934B' : '#9BA1AB')); }
         points.push([s.lat, s.lon]);
         resultats.append(h('li', { class: i === 0 ? 'meilleure' : '' },
           h('div', {}, h('strong', {}, nom), h('div', { class: 'muted petit' }, `${s.adresse}, ${s.code_postal} ${s.ville}`)),
