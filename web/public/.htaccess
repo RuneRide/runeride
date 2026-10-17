@@ -1,4 +1,7 @@
 # o2switch (Apache) : tout passe par index.php sauf les fichiers existants
+# Page d'accueil statique de la vitrine, puis point d'entrée de l'API
+DirectoryIndex index.html index.php
+
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.php [L]
