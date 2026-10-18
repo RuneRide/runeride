@@ -1,4 +1,4 @@
-import { FOND_DE_CARTE, CENTRE_DEFAUT, ZOOM_DEFAUT } from './config.js';
+import { FOND_DE_CARTE, TUILES_VECTORIELLES, CENTRE_DEFAUT, ZOOM_DEFAUT } from './config.js';
 
 const COULEURS = ['#C6934B', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#06b6d4'];
 const ACTIF = '#ef4444';
@@ -11,12 +11,40 @@ export function creerCarte(conteneur) {
   }
   const L = window.L;
   const carte = L.map(conteneur, { scrollWheelZoom: true }).setView(CENTRE_DEFAUT, ZOOM_DEFAUT);
-  L.tileLayer(FOND_DE_CARTE.url, {
+  const raster = L.tileLayer(FOND_DE_CARTE.url, {
     attribution: FOND_DE_CARTE.attribution,
     ...(FOND_DE_CARTE.sousDomaines ? { subdomains: FOND_DE_CARTE.sousDomaines } : {}),
     maxZoom: FOND_DE_CARTE.zoomMax,
-  }).addTo(carte);
+  });
+  const vectoriel = creerCoucheVectorielle(L);
+  if (!vectoriel) { raster.addTo(carte); return carte; }
+  // Un seul fond à la fois : les tuiles vectorielles quand le centre de la vue est dans la zone couverte, OSM sinon.
+  const zone = L.latLngBounds(TUILES_VECTORIELLES.limites);
+  const choisir = () => {
+    const dedans = zone.contains(carte.getCenter());
+    if (dedans && !carte.hasLayer(vectoriel)) { raster.remove(); vectoriel.addTo(carte); }
+    else if (!dedans && !carte.hasLayer(raster)) { vectoriel.remove(); raster.addTo(carte); }
+  };
+  carte.on('moveend', choisir);
+  choisir();
   return carte;
+}
+
+/** Couche PMTiles (protomaps-leaflet, chargé par <script defer>) ; null si indisponible ou désactivée. */
+function creerCoucheVectorielle(L) {
+  if (!TUILES_VECTORIELLES.url || !window.protomapsL) return null;
+  const sombre = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  try {
+    return window.protomapsL.leafletLayer({
+      url: TUILES_VECTORIELLES.url,
+      flavor: sombre ? 'dark' : 'light',
+      lang: 'fr',
+      maxDataZoom: TUILES_VECTORIELLES.zoomDonnees,
+      attribution: TUILES_VECTORIELLES.attribution,
+    });
+  } catch (e) {
+    return null;
+  }
 }
 
 /** Dessine des trajets ({id, titre, trace:[[lat,lon]…]}) ; rend { polylignes, ajuster, activer }. */

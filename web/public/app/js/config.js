@@ -12,6 +12,16 @@ export const FOND_DE_CARTE = {
   zoomMax: 19,
 };
 
+// Tuiles vectorielles PMTiles (Protomaps/OpenStreetMap), servies par carto.runeride.fr et lues par requêtes Range.
+// Elles ne couvrent qu'une zone (Lyon, AURA, PACA, Bourgogne) : hors de cette zone, on retombe sur FOND_DE_CARTE.
+// Passer `url` à null pour désactiver. `limites` = [[sud, ouest], [nord, est]].
+export const TUILES_VECTORIELLES = {
+  url: 'https://carto.runeride.fr/tuiles/aura-paca-bourgogne.pmtiles',
+  limites: [[43.0, 1.9], [48.4, 7.8]],
+  zoomDonnees: 15,
+  attribution: '&copy; <a href="https://protomaps.com">Protomaps</a> &copy; <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>',
+};
+
 // Centre par défaut (France) quand aucun trajet n'est affiché.
 export const CENTRE_DEFAUT = [46.6, 2.5];
 export const ZOOM_DEFAUT = 5;
