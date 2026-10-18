@@ -105,20 +105,14 @@ final class GeorideSync
 
     /**
      * Jeton GeoRide utilisable : le jeton mémorisé, renouvelé s'il date de RENEW_AFTER ou plus (la validité est de 30 jours),
-     * sans jamais redemander le mot de passe. Un compte lié avant le passage au jeton se connecte une dernière fois
-     * avec son mot de passe chiffré, qui est alors effacé.
+     * sans jamais redemander le mot de passe.
      * @param array<string,mixed> $account
      * @throws GeorideException AUTH si le jeton a expiré : le client doit relier son compte
      */
     private function sessionToken(int $userId, array $account, \DateTimeImmutable $now): string
     {
         if ($account['token_enc'] === null) {
-            if ($account['password_enc'] === null) {
-                throw new GeorideException('Jeton GeoRide absent : reliez le compte', GeorideException::AUTH);
-            }
-            $token = $this->client->login((string) $account['georide_email'], $this->vault->decrypt((string) $account['password_enc']));
-            $this->accounts->saveToken($userId, $this->vault->encrypt($token), Time::db($now));
-            return $token;
+            throw new GeorideException('Jeton GeoRide absent : reliez le compte', GeorideException::AUTH);
         }
         $token = $this->vault->decrypt((string) $account['token_enc']);
         $renewed = $account['token_renewed_at'] === null ? null : new \DateTimeImmutable((string) $account['token_renewed_at'], new \DateTimeZone('UTC'));

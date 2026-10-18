@@ -5,10 +5,7 @@ namespace RuneRide\Trips;
 
 use PDO;
 
-/**
- * Compte GeoRide lié et motos choisies. Seul le jeton GeoRide (déjà chiffré par TokenVault) est conservé ;
- * `password_enc` ne subsiste que pour les comptes liés avant le passage au jeton, et se vide à leur première synchro.
- */
+/** Compte GeoRide lié et motos choisies. Seul le jeton GeoRide (déjà chiffré par TokenVault) est conservé, jamais le mot de passe. */
 final class GeorideAccountRepository
 {
     public function __construct(private readonly PDO $pdo) {}
@@ -16,7 +13,7 @@ final class GeorideAccountRepository
     /** @return array<string,mixed>|null */
     public function find(int $userId): ?array
     {
-        $st = $this->pdo->prepare('SELECT user_id, georide_email, password_enc, token_enc, token_renewed_at, tracking_start_at, last_sync_at FROM georide_accounts WHERE user_id = ?');
+        $st = $this->pdo->prepare('SELECT user_id, georide_email, token_enc, token_renewed_at, tracking_start_at, last_sync_at FROM georide_accounts WHERE user_id = ?');
         $st->execute([$userId]);
         return $st->fetch() ?: null;
     }
@@ -29,14 +26,14 @@ final class GeorideAccountRepository
                 ->execute([$userId, $email, $tokenEnc, $now, $trackingStartAt, $now, $now]);
             return;
         }
-        $this->pdo->prepare('UPDATE georide_accounts SET georide_email = ?, token_enc = ?, token_renewed_at = ?, password_enc = NULL, updated_at = ? WHERE user_id = ?')
+        $this->pdo->prepare('UPDATE georide_accounts SET georide_email = ?, token_enc = ?, token_renewed_at = ?, updated_at = ? WHERE user_id = ?')
             ->execute([$email, $tokenEnc, $now, $now, $userId]);
     }
 
-    /** Remplace le jeton (renouvelé ou issu d'une connexion) et efface l'ancien mot de passe chiffré s'il subsistait. */
+    /** Remplace le jeton par sa version renouvelée. */
     public function saveToken(int $userId, string $tokenEnc, string $renewedAt): void
     {
-        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = ?, token_renewed_at = ?, password_enc = NULL, updated_at = ? WHERE user_id = ?')
+        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = ?, token_renewed_at = ?, updated_at = ? WHERE user_id = ?')
             ->execute([$tokenEnc, $renewedAt, Time::now(), $userId]);
     }
 

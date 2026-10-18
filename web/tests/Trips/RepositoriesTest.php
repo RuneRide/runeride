@@ -57,7 +57,7 @@ final class RepositoriesTest extends DbTestCase
         $r->save($u, 'g@x.fr', 'CHIFFRE', '2026-01-01 00:00:00');
         $r->save($u, 'g2@x.fr', 'CHIFFRE2', '2030-01-01 00:00:00');
         $a = $r->find($u);
-        $this->assertSame(['g2@x.fr', 'CHIFFRE2', null, '2026-01-01 00:00:00'], [$a['georide_email'], $a['token_enc'], $a['password_enc'], $a['tracking_start_at']], 'le début du suivi est conservé, aucun mot de passe');
+        $this->assertSame(['g2@x.fr', 'CHIFFRE2', '2026-01-01 00:00:00'], [$a['georide_email'], $a['token_enc'], $a['tracking_start_at']], 'le début du suivi est conservé');
         $r->saveToken($u, 'CHIFFRE3', '2026-03-03 00:00:00');
         $a = $r->find($u);
         $this->assertSame(['CHIFFRE3', '2026-03-03 00:00:00'], [$a['token_enc'], $a['token_renewed_at']]);

@@ -44,7 +44,7 @@ final class TripsApiTest extends DbTestCase
         $this->assertSame(200, $this->api->georideLink($u, ['email' => 'g@x.fr', 'mot_de_passe' => 'secret-georide', 'suivi_depuis' => '2026-03-01T00:00:00Z'])[0]);
         $row = $this->pdo->query('SELECT * FROM georide_accounts')->fetch();
         $this->assertStringNotContainsString('secret-georide', implode('|', array_map('strval', $row)));
-        $this->assertNull($row['password_enc'], 'le mot de passe GeoRide n\'est pas conservé');
+        $this->assertArrayNotHasKey('password_enc', $row, 'aucune colonne ne peut contenir le mot de passe GeoRide');
         $this->assertNotSame('tok', $row['token_enc'], 'le jeton est chiffré au repos');
         $this->assertSame('tok', $this->vault->decrypt($row['token_enc']));
         $this->assertSame('2026-03-01 00:00:00', $row['tracking_start_at']);

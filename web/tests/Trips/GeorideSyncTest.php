@@ -131,36 +131,10 @@ final class GeorideSyncTest extends DbTestCase
         $this->assertSame('tok-ancien', $this->vault->decrypt($this->accounts->find($this->uid)['token_enc']), 'jeton conservé');
     }
 
-    public function testLegacyPasswordAccountLogsInOnceThenDropsThePassword(): void
+    public function testAccountWithoutTokenAsksToRelink(): void
     {
         $this->accounts->select($this->uid, ['7']);
-        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = NULL, token_renewed_at = NULL, password_enc = ? WHERE user_id = ?')
-            ->execute([$this->vault->encrypt('mdp-georide'), $this->uid]);
-
-        $this->sync->sync($this->uid, new \DateTimeImmutable('2026-05-10T12:00:00Z'));
-        $this->assertStringContainsString('"password":"mdp-georide"', (string) $this->http->calls[0]['body']);
-        $a = $this->accounts->find($this->uid);
-        $this->assertNull($a['password_enc'], 'mot de passe effacé après la première connexion');
-        $this->assertSame('tok', $this->vault->decrypt($a['token_enc']));
-
-        $this->sync->sync($this->uid, new \DateTimeImmutable('2026-05-11T12:00:00Z'));
-        $this->assertSame(1, $this->http->count('POST /user/login'), 'plus de connexion par mot de passe ensuite');
-    }
-
-    public function testBadLegacyPasswordSurfacesAsAuthError(): void
-    {
-        $this->accounts->select($this->uid, ['7']);
-        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = NULL, password_enc = ? WHERE user_id = ?')
-            ->execute([$this->vault->encrypt('périmé'), $this->uid]);
-        $this->http->on('POST /user/login', F::json([], 401));
-        $this->expectExceptionCode(GeorideException::AUTH);
-        $this->sync->sync($this->uid);
-    }
-
-    public function testAccountWithoutAnyCredentialAsksToRelink(): void
-    {
-        $this->accounts->select($this->uid, ['7']);
-        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = NULL, password_enc = NULL WHERE user_id = ?')->execute([$this->uid]);
+        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = NULL WHERE user_id = ?')->execute([$this->uid]);
         $this->expectExceptionCode(GeorideException::AUTH);
         $this->sync->sync($this->uid);
     }
