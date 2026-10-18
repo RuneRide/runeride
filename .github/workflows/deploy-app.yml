@@ -77,3 +77,21 @@ jobs:
             .phpunit.result.cache
             composer.lock
             vitrine/**
+      - name: Contrôle de santé après déploiement
+        if: env.HAS_FTP == 'true'
+        run: |
+          # Le cache PHP d'o2switch met ~30 s à voir les nouveaux fichiers : plusieurs essais avant d'échouer.
+          base="https://app.runeride.fr"
+          ok=0
+          for i in $(seq 1 12); do
+            sante=$(curl -sS -m 15 -w ' [%{http_code}]' "$base/api/sante" || true)
+            racine=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' "$base/" || true)
+            jwks=$(curl -sS -m 15 -o /dev/null -w '%{http_code}' "$base/.well-known/jwks.json" || true)
+            echo "essai $i : sante=$sante racine=$racine jwks=$jwks"
+            if [[ "$sante" == *'"statut":"ok"'*'[200]' && "$racine" == "200" && "$jwks" == "200" ]]; then ok=1; break; fi
+            sleep 10
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::Le site ne répond pas correctement après le déploiement (voir les essais ci-dessus). Un 500 sur /api/sante après un envoi incrémental vient souvent d'un vendor/ mélangé entre deux déploiements : supprimer ~/app/.ftp-deploy-sync-state.json sur le serveur puis relancer ce workflow pour un envoi complet (ops/README.md)."
+            exit 1
+          fi

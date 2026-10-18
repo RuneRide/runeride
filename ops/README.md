@@ -22,3 +22,9 @@ Chaque script sans option est une simulation. Après la mise en place, plus rien
 `.env`, `storage/**`, `tests/**`, `composer.lock`, et `vitrine/**` (anciennes pages de la vitrine, archivées hors de la racine web ; la vitrine vit dans `RuneRide/website`).
 
 L'interface (PWA) est à la racine de `app.runeride.fr` ; l'ancienne adresse `/app/…` redirige (301) vers `/…`, et `app/sw.js` est un ancien service worker qui se désinstalle.
+
+## Contrôle après déploiement et envoi complet
+
+Le workflow se termine par un contrôle de santé : `/api/sante` doit répondre `{"statut":"ok"…}` (HTTP 200), `/` et `/.well-known/jwks.json` aussi (jusqu'à 12 essais espacés de 10 s, le cache PHP d'o2switch mettant ~30 s à voir les nouveaux fichiers). Sinon le workflow échoue.
+
+Le déploiement FTPS est incrémental : il compare avec son fichier d'état `~/app/.ftp-deploy-sync-state.json`, pas avec le serveur. Si deux déploiements se suivent de très près ou si un envoi est interrompu, `vendor/` peut mélanger deux versions (erreur PHP `Class "ComposerAutoloaderInit…" not found`, tout l'API en 500). Réparation : supprimer ce fichier d'état sur le serveur (il n'apparaît pas dans le listage cPanel des fichiers, mais se lit et se supprime par son nom), puis relancer `gh workflow run deploy-app.yml --ref main` : l'envoi est alors complet.
