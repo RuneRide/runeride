@@ -19,6 +19,11 @@ export const TUILES_VECTORIELLES = {
   url: 'https://carto.runeride.fr/tuiles/aura-paca-bourgogne.pmtiles',
   limites: [[43.0, 1.9], [48.4, 7.8]],
   zoomDonnees: 15,
+  // Lecture directe par position (?o=&l=) : le serveur d'o2switch lit les fichiers statiques depuis le début jusqu'à la
+  // position demandée (3 à 4 s en fin de fichier), alors que plage.php va directement au bon endroit (~0,1 s).
+  // `version` change quand le fichier est remplacé (les réponses sont immuables côté navigateur et serveur).
+  // Passer `lecture` à null pour lire `url` par requêtes Range classiques (ex. depuis S3 + CloudFront).
+  lecture: { url: 'https://carto.runeride.fr/tuiles/plage.php', fichier: 'aura-paca-bourgogne', version: '20261018' },
   attribution: '&copy; <a href="https://protomaps.com">Protomaps</a> &copy; <a href="https://www.openstreetmap.org/copyright">contributeurs OpenStreetMap</a>',
 };
 

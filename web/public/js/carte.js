@@ -37,13 +37,31 @@ export function creerCarte(conteneur) {
   return carte;
 }
 
+/** Source d'octets pour pmtiles.js : chaque lecture est une adresse complète (?f=&o=&l=&v=), donc cachable. */
+class LectureDirecte {
+  constructor({ url, fichier, version }) { this.url = url; this.fichier = fichier; this.version = version; }
+  getKey() { return `${this.url}?f=${this.fichier}&v=${this.version}`; }
+  async getBytes(position, longueur, signal) {
+    const rep = await fetch(`${this.url}?f=${this.fichier}&o=${position}&l=${longueur}&v=${this.version}`, { signal });
+    if (!rep.ok) throw new Error(`Lecture des tuiles : HTTP ${rep.status}`);
+    return { data: await rep.arrayBuffer(), etag: this.version };
+  }
+}
+
+/** Adresse du fichier, ou source de lecture directe si pmtiles.js est chargé et `lecture` configuré. */
+function sourceTuiles() {
+  const l = TUILES_VECTORIELLES.lecture;
+  if (l && window.pmtiles) return new window.pmtiles.PMTiles(new LectureDirecte(l));
+  return TUILES_VECTORIELLES.url;
+}
+
 /** Couche PMTiles (protomaps-leaflet, chargé par <script defer>) ; null si indisponible ou désactivée. */
 function creerCoucheVectorielle(L) {
   if (!TUILES_VECTORIELLES.url || !window.protomapsL) return null;
   const sombre = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   try {
     return window.protomapsL.leafletLayer({
-      url: TUILES_VECTORIELLES.url,
+      url: sourceTuiles(),
       flavor: sombre ? 'dark' : 'light',
       lang: 'fr',
       maxDataZoom: TUILES_VECTORIELLES.zoomDonnees,
