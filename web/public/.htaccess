@@ -1,6 +1,6 @@
 # o2switch (Apache) : tout passe par index.php sauf les fichiers existants
 # La vitrine est un site à part (dépôt RuneRide/website)
-# index.html d'abord : /app/ doit servir l'interface ; index.php reste le point d'entrée de l'API
+# index.html d'abord : la racine sert l'interface ; index.php reste le point d'entrée de l'API
 DirectoryIndex index.html index.php
 Options -Indexes
 AddDefaultCharset UTF-8
@@ -11,11 +11,10 @@ AddType text/javascript .js
 
 RewriteEngine On
 
-# app.runeride.fr : la racine renvoie vers l'interface (la vitrine vit sur runeride.fr)
-RewriteRule ^$ /app/ [R=302,L]
-
-# Interface web (PWA statique) : jamais envoyée vers index.php, y compris /app/ (répertoire)
-RewriteRule ^app(/|$) - [L]
+# app.runeride.fr : l'interface (PWA) est à la racine. L'ancienne adresse /app/… est redirigée vers /…
+# (sauf /app/sw.js : ancien service worker, qui se désinstalle seul).
+RewriteRule ^app/sw\.js$ - [L]
+RewriteRule ^app(?:/(.*))?$ /$1 [R=301,L]
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.php [L]

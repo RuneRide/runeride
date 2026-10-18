@@ -76,11 +76,4 @@ jobs:
             phpunit.xml
             .phpunit.result.cache
             composer.lock
-            public/index.html
-            public/cgv.html
-            public/confidentialite.html
-            public/mentions-legales.html
-            public/importer-insta360.html
-            public/site.css
-            public/montage.jpg
-            public/reperer-couper.jpg
+            vitrine/**

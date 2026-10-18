@@ -1,6 +1,6 @@
 /* Tokens de la charte RuneRide (identity/tokens/tokens.css) : dark-first, aplats mats, bordures 1 px. */
-@font-face { font-family: "Inter"; src: url("../fonts/inter-var.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
-@font-face { font-family: "JetBrains Mono"; src: url("../fonts/jetbrains-mono-var.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("fonts/inter-var.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/jetbrains-mono-var.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
 :root {
   --bg: #17191C; --panel: #212429; --line: #2E323B; --text: #EBE8E0; --muted: #9BA1AB;
   --accent: #C6934B; --accent-fond: #C6934B; --accent-pressed: #A87938; --sur-accent: #17191C;

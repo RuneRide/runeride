@@ -19,4 +19,6 @@ Chaque script sans option est une simulation. Après la mise en place, plus rien
 
 ## Ce que la CI ne touche jamais
 
-`.env`, `storage/**`, `tests/**`, `composer.lock`, et les anciennes pages de vitrine de `web/public` (déplacées dans `RuneRide/website`).
+`.env`, `storage/**`, `tests/**`, `composer.lock`, et `vitrine/**` (anciennes pages de la vitrine, archivées hors de la racine web ; la vitrine vit dans `RuneRide/website`).
+
+L'interface (PWA) est à la racine de `app.runeride.fr` ; l'ancienne adresse `/app/…` redirige (301) vers `/…`, et `app/sw.js` est un ancien service worker qui se désinstalle.

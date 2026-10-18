@@ -1,11 +1,11 @@
 {
-  "id": "/app/",
+  "id": "/",
   "name": "RuneRide",
   "short_name": "RuneRide",
   "description": "Vos trajets à moto sur une carte et le ravitaillement le moins cher sur votre route.",
   "lang": "fr",
-  "start_url": "/app/",
-  "scope": "/app/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#17191C",
@@ -19,6 +19,6 @@
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ],
   "shortcuts": [
-    { "name": "Pit-stop", "short_name": "Pit-stop", "description": "Station-service la moins chère à proximité", "url": "/app/#/ravitaillement" }
+    { "name": "Pit-stop", "short_name": "Pit-stop", "description": "Station-service la moins chère à proximité", "url": "/#/ravitaillement" }
   ]
 }
