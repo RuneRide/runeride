@@ -70,6 +70,10 @@ main.plein { max-width: none; margin: 0; padding: 0; }
 .btn.plein { width: 100%; }
 .btn:disabled { opacity: .55; cursor: progress; }
 .btn .icone { width: 18px; height: 18px; }
+.btn.google { background: #fff; color: #1f1f1f; border-color: #dadce0; }
+.btn.google:hover { background: #f8f9fa; border-color: #d2e3fc; }
+.separateur { display: flex; align-items: center; gap: 12px; margin: 14px 0; color: var(--muted); font-size: 13px; }
+.separateur::before, .separateur::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .lien { font: inherit; background: none; border: 0; padding: 6px 0; color: var(--accent); cursor: pointer; text-decoration: underline; }
 .champ { display: block; margin: 0 0 14px; }
 .champ > span { display: block; font-size: 14px; font-weight: 600; margin: 0 0 4px; }
