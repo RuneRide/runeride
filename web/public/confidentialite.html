@@ -18,7 +18,7 @@
 </div></header>
 <main class="legal">
 <h1>Politique de confidentialité</h1>
-<p class="muted">Version du 17 octobre 2026.</p>
+<p class="muted">Version du 18 octobre 2026.</p>
 <p>Cette politique décrit les données personnelles que RuneRide (le site runeride.fr et l'application app.runeride.fr) collecte, pourquoi, avec qui elles sont partagées, combien de temps elles sont conservées et comment exercer vos droits. Elle s'applique à toute personne qui crée un compte ou utilise le service, y compris par «&nbsp;Se connecter avec Google&nbsp;».</p>
 <h2>Responsable du traitement</h2>
 <p>Philippe Vienne, entrepreneur individuel, voir les <a href="mentions-legales.html">mentions légales</a>. Contact pour toute question ou pour exercer vos droits : <a href="mailto:contact@runeride.fr">contact@runeride.fr</a>.</p>
@@ -27,7 +27,8 @@
 <tr><th>Données</th><th>Pourquoi</th><th>Base légale</th></tr>
 <tr><td>Adresse de courriel, mot de passe (sous forme protégée)</td><td>Créer le compte et s'y connecter, envoyer les courriels du service</td><td>Exécution du contrat</td></tr>
 <tr><td>Vidéos envoyées, avec leur télémétrie (caméra, mouvements, date et heure)</td><td>Stockage, analyse, montage et export demandés par le client</td><td>Exécution du contrat</td></tr>
-<tr><td>Traces GPS déposées, positions GeoRide si le client relie son compte, position transmise pour chercher une station-service</td><td>Trajet, vitesse et moments forts affichés au client</td><td>Exécution du contrat</td></tr>
+<tr><td>Traces GPS déposées, position transmise pour chercher une station-service</td><td>Trajet, vitesse et moments forts affichés au client</td><td>Exécution du contrat</td></tr>
+<tr><td>Si le client relie son compte GeoRide : adresse de courriel GeoRide, jeton d'accès GeoRide (chiffré), motos et trajets importés (dates, distances, tracés GPS)</td><td>Importer et afficher les trajets du client. Le mot de passe GeoRide sert uniquement au moment de la liaison et n'est pas conservé</td><td>Exécution du contrat</td></tr>
 <tr><td>Palier, dates, historique des paiements, identifiants du client chez Mollie</td><td>Facturation, suivi de l'abonnement, obligations comptables</td><td>Exécution du contrat, obligation légale</td></tr>
 <tr><td>Journaux techniques (adresse IP, date, requête)</td><td>Sécurité et diagnostic</td><td>Intérêt légitime</td></tr>
 </table></div>
@@ -40,6 +41,7 @@ sont ceux de la session de connexion, strictement nécessaires au service.</p>
 <li>o2switch : hébergement du site, de l'application et de la base de données des comptes (France). Amazon Web Services EMEA SARL : stockage des vidéos du service d'atelier 360° (en préparation), dans la région de Stockholm (Suède). Les données restent dans l'Union européenne ; AWS agit comme sous-traitant au sens du RGPD, dans le cadre de son accord de traitement des données.</li>
 <li>Google Ireland Limited : uniquement si vous choisissez de vous connecter avec Google (voir la section ci-dessous). RuneRide n'envoie aucune donnée à Google, il reçoit seulement les informations de votre compte Google décrites plus bas.</li>
 <li>Mollie B.V. (Pays-Bas) : paiement. Mollie reçoit l'adresse de courriel du client et les données de son moyen de paiement, que RuneRide ne voit pas.</li>
+<li>GeoRide (Kible SAS) : si vous reliez votre compte, RuneRide se connecte à l'API de GeoRide avec vos identifiants au moment de la liaison, puis avec un jeton d'accès, pour récupérer vos propres trajets. RuneRide n'envoie aucune autre donnée à GeoRide.</li>
 </ul>
 <h2>Connexion avec Google</h2>
 <p>Vous pouvez créer un compte ou vous connecter avec votre compte Google plutôt qu'avec un mot de passe. Dans ce cas, RuneRide demande à Google uniquement les informations suivantes (périmètres OAuth <code>openid</code> et <code>email</code>) :</p>
@@ -58,6 +60,7 @@ sont ceux de la session de connexion, strictement nécessaires au service.</p>
 <li>Après un abonnement : 30 jours d'accès, puis 180 jours en archive, puis suppression.</li>
 <li>Exports : 30 jours. Corbeille : 30 jours.</li>
 <li>Compte supprimé par le client : fichiers, index et compte effacés immédiatement.</li>
+<li>Liaison GeoRide : le jeton est effacé quand vous déliez GeoRide ou supprimez votre compte. Sans synchronisation pendant 30 jours, il expire et le compte doit être relié de nouveau.</li>
 <li>Pièces comptables (paiements, reçus) : 10 ans, conformément aux obligations comptables françaises.</li>
 <li>Journaux techniques : 6 mois.</li>
 </ul>
@@ -65,7 +68,7 @@ sont ceux de la session de connexion, strictement nécessaires au service.</p>
 <p>Vous disposez des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité. La suppression du compte se fait depuis la page «&nbsp;Mon palier&nbsp;».
 Pour le reste, écrivez à <a href="mailto:contact@runeride.fr">contact@runeride.fr</a>. Vous pouvez introduire une réclamation auprès de la CNIL (www.cnil.fr).</p>
 <h2>Sécurité</h2>
-<p>Les échanges sont chiffrés (HTTPS). Les fichiers de chaque client sont séparés par compte, et les accès au stockage passent par des adresses signées à durée limitée. Les mots de passe ne sont jamais stockés en clair. L'accès d'administration aux serveurs est limité à l'éditeur.</p>
+<p>Les échanges sont chiffrés (HTTPS). Les fichiers de chaque client sont séparés par compte, et les accès au stockage passent par des adresses signées à durée limitée. Les mots de passe ne sont jamais stockés en clair. Le jeton d'accès GeoRide est chiffré au repos. L'accès d'administration aux serveurs est limité à l'éditeur.</p>
 </main>
 <footer><div class="wrap">
   <span class="foot-brand"><img src="/brand/monogram.svg" alt="" width="16" height="20">RuneRide Cloud</span>
