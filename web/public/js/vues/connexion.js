@@ -40,6 +40,8 @@ export function vueConnexion(racine, { aller, params }) {
     h('label', { class: 'champ' }, h('span', {}, 'Adresse e-mail'), email),
     h('label', { class: 'champ' }, h('span', {}, 'Mot de passe'), h('div', { class: 'champ-mdp' }, mdp, oeil), aide),
     msg, bouton);
+  const erreurGoogle = params.get('erreur') === 'google' ? bandeau('erreur', 'La connexion avec Google a échoué. Réessayez, ou utilisez votre adresse e-mail.') : null;
+  const google = h('a', { class: 'btn plein', href: '/api/google' }, 'Continuer avec Google');
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     msg.replaceChildren();
@@ -62,6 +64,6 @@ export function vueConnexion(racine, { aller, params }) {
     h('img', { class: 'logo', src: 'brand/monogram.svg', alt: '', width: 56, height: 70 }),
     h('h1', {}, 'Rune', h('span', { style: 'color: var(--accent)' }, 'Ride')),
     h('p', { class: 'promesse' }, 'Vos trajets à moto sur une carte, et le carburant le moins cher sur votre route.'),
-    form));
+    erreurGoogle, google, form));
   email.focus({ preventScroll: true });
 }
