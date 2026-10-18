@@ -17,5 +17,5 @@
     "autoload": { "psr-4": { "RuneRide\\": "src/" } },
     "autoload-dev": { "psr-4": { "RuneRide\\Tests\\": "tests/" } },
     "scripts": { "test": "phpunit", "serve": "php -S 127.0.0.1:8080 -t public" },
-    "config": { "optimize-autoloader": true, "sort-packages": true }
+    "config": { "autoloader-suffix": "RuneRide", "optimize-autoloader": true, "sort-packages": true }
 }
