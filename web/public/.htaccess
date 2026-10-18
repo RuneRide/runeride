@@ -16,7 +16,9 @@ RewriteEngine On
 RewriteRule ^app/sw\.js$ - [L]
 RewriteRule ^app(?:/(.*))?$ /$1 [R=301,L]
 
+# Les répertoires (la racine /) passent par DirectoryIndex : index.html sert l'interface
 RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [L]
 
 # Apache/FastCGI retire parfois l'en-tête Authorization : on le transmet à PHP
