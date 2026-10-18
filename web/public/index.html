@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RuneRide — mes trajets</title>
 <meta name="description" content="Vos trajets à moto GeoRide sur une carte, et le ravitaillement le moins cher sur votre route.">
+
 <meta name="theme-color" content="#17191C" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
@@ -19,15 +20,16 @@
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="#/trajets"><picture><source media="(prefers-color-scheme: light)" srcset="brand/monogram-mono-dark.svg"><img src="brand/monogram.svg" alt="" width="26" height="32"></picture><span>Rune<span class="ride">Ride</span></span></a>
-  <nav id="nav" hidden>
-    <a href="#/trajets" data-route="trajets">Trajets</a>
-    <a href="#/ravitaillement" data-route="ravitaillement">Pit-stop</a>
-    <a href="#/georide" data-route="georide">GeoRide</a>
+  <a class="brand" href="#/trajets"><picture><source media="(prefers-color-scheme: light)" srcset="brand/monogram-mono-dark.svg"><img src="brand/monogram.svg" alt="" width="24" height="30"></picture><span>Rune<span class="ride">Ride</span></span></a>
+  <nav id="nav" aria-label="Navigation principale" hidden>
+    <a href="#/trajets" data-route="trajets"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg><span>Trajets</span></a>
+    <a href="#/ravitaillement" data-route="ravitaillement"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg><span>Pit-stop</span></a>
+    <a href="#/compte" data-route="compte"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Compte</span></a>
   </nav>
-  <button id="deconnexion" class="lien" type="button" hidden>Se déconnecter</button>
+  <button id="deconnexion" class="sortie-haut" type="button" hidden><svg class="icone" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg><span>Se déconnecter</span></button>
 </header>
-<main id="vue" tabindex="-1"><p class="muted">Chargement…</p></main>
+<main id="vue" tabindex="-1" aria-live="polite"><div class="squelette l" style="margin:24px 16px;max-width:320px"></div></main>
+<div id="toasts" aria-live="polite"></div>
 <noscript><p class="wrap">RuneRide a besoin de JavaScript pour afficher vos trajets.</p></noscript>
 </body>
 </html>

@@ -1,9 +1,10 @@
 // Service worker de RuneRide (portée /) : met l'interface en cache, jamais les réponses de l'API.
-const VERSION = 'v4';
+const VERSION = 'v5';
 const CACHE = `runeride-app-${VERSION}`;
 const SHELL = [
   './', 'index.html', 'app.css', 'manifest.webmanifest',
-  'js/main.js', 'js/config.js', 'js/api.js', 'js/dom.js', 'js/carte.js', 'js/vues.js',
+  'js/main.js', 'js/config.js', 'js/api.js', 'js/dom.js', 'js/carte.js', 'js/icones.js',
+  'js/vues/commun.js', 'js/vues/connexion.js', 'js/vues/trajets.js', 'js/vues/pitstop.js', 'js/vues/compte.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   'brand/monogram.svg', 'brand/monogram-mono-dark.svg', 'fonts/inter-var.woff2', 'fonts/jetbrains-mono-var.woff2', 'favicon.ico',
 ];

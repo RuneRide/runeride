@@ -29,3 +29,31 @@ export const fmtEuro = (v, devise = 'EUR') => new Intl.NumberFormat('fr-FR', { s
 export function bandeau(type, ...contenu) {
   return h('div', { class: `bandeau ${type}`, role: type === 'erreur' ? 'alert' : 'status' }, ...contenu);
 }
+
+export const fmtVitesse = (km, min) => (min > 0 ? `${Math.round((km / min) * 60)} km/h` : '—');
+export const fmtMois = (iso) => new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date(iso));
+export const fmtJour = (iso) => new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(iso));
+export const fmtHeure = (iso) => new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+export const fmtPrixLitre = (v) => `${Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+
+/** « il y a 3 h », « hier »… */
+export function fmtRelatif(iso) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  const rtf = new Intl.RelativeTimeFormat('fr-FR', { numeric: 'auto' });
+  if (s < 90) return 'à l\'instant';
+  if (s < 3600) return rtf.format(-Math.round(s / 60), 'minute');
+  if (s < 86400) return rtf.format(-Math.round(s / 3600), 'hour');
+  return rtf.format(-Math.round(s / 86400), 'day');
+}
+
+/** Message bref non bloquant (succès, information, erreur d'une action). */
+export function toast(type, texte, duree = 5000) {
+  const zone = document.getElementById('toasts');
+  if (!zone) return;
+  const el = h('div', { class: `toast ${type}`, role: type === 'erreur' ? 'alert' : 'status' }, texte);
+  zone.append(el);
+  setTimeout(() => { el.classList.add('sortie'); setTimeout(() => el.remove(), 250); }, duree);
+}
+
+/** Bloc d'attente (squelette) : l'espace est réservé, sans saut de mise en page. */
+export const squelette = (classe = '') => h('div', { class: `squelette ${classe}`, 'aria-hidden': 'true' });
