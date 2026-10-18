@@ -85,6 +85,7 @@ if [[ $MIGRATE -eq 1 ]]; then
     echo "tâche cron supprimée"
   }
   trap cleanup EXIT
+  api2 Fileman fileop "op=unlink" "sourcefiles=$home/$APP_DIR/$log" "doubledecode=0" >/dev/null 2>&1 || true  # sinon un ancien journal (avec FIN) ferait croire que la tâche a déjà tourné
   echo "tâche planifiée, attente de son exécution (jusqu'à 3 minutes)…"
   out=""
   for _ in $(seq 1 18); do
