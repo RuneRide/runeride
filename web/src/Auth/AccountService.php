@@ -41,4 +41,28 @@ final class AccountService
         $this->throttle?->clear($key);
         return [200, ['jeton' => $this->jwt->issue((int) $user['id'])]];
     }
+
+    /**
+     * Compte d'une personne dont Google a vérifié l'adresse : retrouvé par son identifiant Google, sinon rattaché
+     * au compte de même adresse, sinon créé.
+     *
+     * @return array{0:int,1:array<string,mixed>}
+     */
+    public function loginWithGoogle(string $sub, string $email): array
+    {
+        $email = mb_strtolower(trim($email));
+        $user = $this->users->findByGoogleSub($sub);
+        if ($user === null) {
+            $user = $this->users->findByEmail($email);
+            if ($user !== null && $user['google_sub'] !== null) {
+                return [409, ['erreur' => 'adresse déjà liée à un autre compte Google']];
+            }
+            if ($user !== null) {
+                $this->users->linkGoogle((int) $user['id'], $sub);
+            } else {
+                $user = ['id' => $this->users->createGoogle($email, $sub)];
+            }
+        }
+        return [200, ['jeton' => $this->jwt->issue((int) $user['id'])]];
+    }
 }

@@ -17,6 +17,14 @@ function analyser() {
 
 async function rendre() {
   const { segments, params } = analyser();
+  // Retour de « Continuer avec Google » : le serveur a mis le jeton dans le fragment.
+  if (segments[0] === 'google') {
+    const jeton = params.get('jeton');
+    if (jeton) ecrireJeton(jeton);
+    // replace : le jeton ne reste pas dans l'historique du navigateur
+    window.location.replace(`#${jeton ? '/trajets' : '/connexion?erreur=google'}`);
+    return;
+  }
   const connecte = Boolean(lireJeton());
   nav.hidden = boutonSortie.hidden = !connecte;
   const [route, arg] = segments;

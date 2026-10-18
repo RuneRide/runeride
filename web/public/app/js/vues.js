@@ -53,7 +53,9 @@ export function vueConnexion(racine, { aller, params }) {
     }
   });
   maj();
-  afficher(racine, h('div', { class: 'etroit' }, titre, form));
+  const google = h('a', { class: 'btn', href: '/api/google' }, 'Continuer avec Google');
+  const erreurGoogle = params.get('erreur') === 'google' ? bandeau('erreur', 'La connexion avec Google a échoué. Réessayez, ou utilisez votre adresse e-mail.') : null;
+  afficher(racine, h('div', { class: 'etroit' }, titre, erreurGoogle, google, form));
 }
 
 // ---------- Liste + carte des trajets ----------
