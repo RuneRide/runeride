@@ -5,7 +5,10 @@ namespace RuneRide\Trips;
 
 use PDO;
 
-/** Compte GeoRide lié (mot de passe déjà chiffré par TokenVault) et motos choisies. */
+/**
+ * Compte GeoRide lié et motos choisies. Seul le jeton GeoRide (déjà chiffré par TokenVault) est conservé ;
+ * `password_enc` ne subsiste que pour les comptes liés avant le passage au jeton, et se vide à leur première synchro.
+ */
 final class GeorideAccountRepository
 {
     public function __construct(private readonly PDO $pdo) {}
@@ -13,21 +16,28 @@ final class GeorideAccountRepository
     /** @return array<string,mixed>|null */
     public function find(int $userId): ?array
     {
-        $st = $this->pdo->prepare('SELECT user_id, georide_email, password_enc, tracking_start_at, last_sync_at FROM georide_accounts WHERE user_id = ?');
+        $st = $this->pdo->prepare('SELECT user_id, georide_email, password_enc, token_enc, token_renewed_at, tracking_start_at, last_sync_at FROM georide_accounts WHERE user_id = ?');
         $st->execute([$userId]);
         return $st->fetch() ?: null;
     }
 
-    public function save(int $userId, string $email, string $passwordEnc, ?string $trackingStartAt): void
+    public function save(int $userId, string $email, string $tokenEnc, ?string $trackingStartAt): void
     {
         $now = Time::now();
         if ($this->find($userId) === null) {
-            $this->pdo->prepare('INSERT INTO georide_accounts (user_id, georide_email, password_enc, tracking_start_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-                ->execute([$userId, $email, $passwordEnc, $trackingStartAt, $now, $now]);
+            $this->pdo->prepare('INSERT INTO georide_accounts (user_id, georide_email, token_enc, token_renewed_at, tracking_start_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+                ->execute([$userId, $email, $tokenEnc, $now, $trackingStartAt, $now, $now]);
             return;
         }
-        $this->pdo->prepare('UPDATE georide_accounts SET georide_email = ?, password_enc = ?, updated_at = ? WHERE user_id = ?')
-            ->execute([$email, $passwordEnc, $now, $userId]);
+        $this->pdo->prepare('UPDATE georide_accounts SET georide_email = ?, token_enc = ?, token_renewed_at = ?, password_enc = NULL, updated_at = ? WHERE user_id = ?')
+            ->execute([$email, $tokenEnc, $now, $now, $userId]);
+    }
+
+    /** Remplace le jeton (renouvelé ou issu d'une connexion) et efface l'ancien mot de passe chiffré s'il subsistait. */
+    public function saveToken(int $userId, string $tokenEnc, string $renewedAt): void
+    {
+        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = ?, token_renewed_at = ?, password_enc = NULL, updated_at = ? WHERE user_id = ?')
+            ->execute([$tokenEnc, $renewedAt, Time::now(), $userId]);
     }
 
     public function touchLastSync(int $userId, string $at): void

@@ -144,7 +144,7 @@ export async function vueGeoride(racine) {
     const depuis = h('input', { type: 'date', id: 'g-depuis' });
     const bouton = h('button', { class: 'btn primaire', type: 'submit' }, 'Lier mon compte');
     const form = h('form', { class: 'carte formulaire' },
-      h('p', {}, 'Saisissez vos identifiants GeoRide. Ils servent uniquement à récupérer vos trajets ; le mot de passe est conservé chiffré.'),
+      h('p', {}, 'Saisissez vos identifiants GeoRide. Ils servent uniquement à récupérer vos trajets ; votre mot de passe n\'est pas conservé, seul un jeton d\'accès GeoRide l\'est (chiffré). Après une longue absence, il faudra relier le compte.'),
       h('label', { for: 'g-email' }, 'E-mail GeoRide'), email,
       h('label', { for: 'g-mdp' }, 'Mot de passe GeoRide'), mdp,
       h('label', { for: 'g-depuis' }, 'Importer à partir du (facultatif)'), depuis,

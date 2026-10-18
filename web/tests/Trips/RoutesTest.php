@@ -62,7 +62,7 @@ final class RoutesTest extends DbTestCase
     {
         $u = $this->makeUser();
         $repo = new \RuneRide\Trips\GeorideAccountRepository($this->pdo);
-        $repo->save($u, 'g@x.fr', $this->vault->encrypt('pw'), null);
+        $repo->save($u, 'g@x.fr', $this->vault->encrypt('tok'), null);
         $this->assertSame(409, $this->call('POST', '/api/georide/synchronisation', $u)[0], 'aucune moto choisie');
         $this->assertSame(['Duke'], array_column($this->call('GET', '/api/georide/motos', $u)[1]['motos'], 'name'));
         $repo->select($u, ['7']);

@@ -57,7 +57,7 @@ final class TripsApi
         ]];
     }
 
-    /** Lie (ou relie) le compte GeoRide après avoir vérifié les identifiants ; le mot de passe est stocké chiffré. @param array<string,mixed> $b */
+    /** Lie (ou relie) le compte GeoRide après avoir vérifié les identifiants ; seul le jeton GeoRide est stocké (chiffré), jamais le mot de passe. @param array<string,mixed> $b */
     public function georideLink(int $uid, array $b): array
     {
         $email = trim((string) ($b['email'] ?? ''));
@@ -66,13 +66,13 @@ final class TripsApi
             return [422, ['erreur' => 'email et mot de passe GeoRide requis']];
         }
         try {
-            $this->georide->login($email, $password);
+            $token = $this->georide->login($email, $password);
         } catch (GeorideException $e) {
             return $this->georideError($e);
         }
         $existing = $this->accounts->find($uid);
         $start = Time::parse(isset($b['suivi_depuis']) ? (string) $b['suivi_depuis'] : null);
-        $this->accounts->save($uid, $email, $this->vault->encrypt($password), $existing['tracking_start_at'] ?? $start);
+        $this->accounts->save($uid, $email, $this->vault->encrypt($token), $existing['tracking_start_at'] ?? $start);
         return [200, ['lie' => true, 'email' => $email]];
     }
 
@@ -154,7 +154,7 @@ final class TripsApi
     private function georideError(GeorideException $e): array
     {
         return match ($e->getCode()) {
-            GeorideException::AUTH => [422, ['erreur' => 'identifiants GeoRide refusés']],
+            GeorideException::AUTH => [422, ['erreur' => 'identifiants GeoRide refusés ou session expirée : reliez votre compte']],
             GeorideException::RATE_LIMIT => [429, ['erreur' => 'GeoRide limite le débit, réessayez plus tard']],
             GeorideException::NETWORK => [502, ['erreur' => 'GeoRide injoignable']],
             default => [502, ['erreur' => 'réponse GeoRide inattendue']],
