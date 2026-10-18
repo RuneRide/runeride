@@ -1,0 +1,15 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+// Tâche planifiée (une fois par jour suffit) : renouvelle les jetons GeoRide arrivés à 7 jours, avant leur expiration à 30 jours.
+// Code de sortie 1 si GeoRide a été injoignable ou a répondu en erreur pour au moins un compte (les comptes à relier ne sont pas une erreur).
+require __DIR__ . '/../vendor/autoload.php';
+use RuneRide\Trips\{GeorideAccountRepository, GeorideClient, GeorideSync, TokenVault, TripRepository};
+
+$config = RuneRide\Config::load(__DIR__ . '/../.env');
+$pdo = RuneRide\Database::connect($config);
+$client = new GeorideClient(new RuneRide\Http\CurlHttpClient(15, 5), $config->get('RUNERIDE_GEORIDE_URL', 'https://api.georide.com'));
+$sync = new GeorideSync($client, new GeorideAccountRepository($pdo), new TripRepository($pdo), new TokenVault($config->get('RUNERIDE_GEORIDE_KEY')));
+$r = $sync->renewDueTokens();
+echo sprintf("Jetons GeoRide : %d renouvelé(s), %d à relier, %d erreur(s).\n", $r['renouveles'], $r['a_relier'], $r['erreurs']);
+exit($r['erreurs'] > 0 ? 1 : 0);

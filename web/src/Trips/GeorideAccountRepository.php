@@ -13,7 +13,7 @@ final class GeorideAccountRepository
     /** @return array<string,mixed>|null */
     public function find(int $userId): ?array
     {
-        $st = $this->pdo->prepare('SELECT user_id, georide_email, token_enc, token_renewed_at, tracking_start_at, last_sync_at FROM georide_accounts WHERE user_id = ?');
+        $st = $this->pdo->prepare('SELECT user_id, georide_email, token_enc, token_renewed_at, relier_requis, tracking_start_at, last_sync_at, last_sync_new, last_sync_total, last_sync_error FROM georide_accounts WHERE user_id = ?');
         $st->execute([$userId]);
         return $st->fetch() ?: null;
     }
@@ -26,15 +26,42 @@ final class GeorideAccountRepository
                 ->execute([$userId, $email, $tokenEnc, $now, $trackingStartAt, $now, $now]);
             return;
         }
-        $this->pdo->prepare('UPDATE georide_accounts SET georide_email = ?, token_enc = ?, token_renewed_at = ?, updated_at = ? WHERE user_id = ?')
+        $this->pdo->prepare('UPDATE georide_accounts SET georide_email = ?, token_enc = ?, token_renewed_at = ?, relier_requis = 0, last_sync_error = NULL, updated_at = ? WHERE user_id = ?')
             ->execute([$email, $tokenEnc, $now, $now, $userId]);
     }
 
     /** Remplace le jeton par sa version renouvelée. */
     public function saveToken(int $userId, string $tokenEnc, string $renewedAt): void
     {
-        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = ?, token_renewed_at = ?, updated_at = ? WHERE user_id = ?')
+        $this->pdo->prepare('UPDATE georide_accounts SET token_enc = ?, token_renewed_at = ?, relier_requis = 0, updated_at = ? WHERE user_id = ?')
             ->execute([$tokenEnc, $renewedAt, Time::now(), $userId]);
+    }
+
+    /** GeoRide a refusé le jeton : le client doit relier son compte (motos et trajets sont conservés). */
+    public function markRelinkRequired(int $userId): void
+    {
+        $this->pdo->prepare('UPDATE georide_accounts SET relier_requis = 1, updated_at = ? WHERE user_id = ?')->execute([Time::now(), $userId]);
+    }
+
+    /** Résultat de la dernière synchronisation réussie (nombre de trajets nouveaux et vus). */
+    public function recordSync(int $userId, string $at, int $new, int $total): void
+    {
+        $this->pdo->prepare('UPDATE georide_accounts SET last_sync_at = ?, last_sync_new = ?, last_sync_total = ?, last_sync_error = NULL, updated_at = ? WHERE user_id = ?')
+            ->execute([$at, $new, $total, Time::now(), $userId]);
+    }
+
+    /** Échec de la dernière synchronisation : code court (auth, debit, reseau, autre), sans toucher à la date de la dernière réussie. */
+    public function recordSyncError(int $userId, string $code): void
+    {
+        $this->pdo->prepare('UPDATE georide_accounts SET last_sync_error = ?, updated_at = ? WHERE user_id = ?')->execute([$code, Time::now(), $userId]);
+    }
+
+    /** @return list<int> comptes dont le jeton date de $renewedBefore ou plus (ou n'a pas de date) et qui n'attendent pas déjà d'être reliés */
+    public function dueForRenewal(string $renewedBefore): array
+    {
+        $st = $this->pdo->prepare('SELECT user_id FROM georide_accounts WHERE token_enc IS NOT NULL AND relier_requis = 0 AND (token_renewed_at IS NULL OR token_renewed_at <= ?) ORDER BY user_id');
+        $st->execute([$renewedBefore]);
+        return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
     }
 
     public function touchLastSync(int $userId, string $at): void

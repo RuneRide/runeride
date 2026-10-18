@@ -54,6 +54,21 @@ final class GeorideClientTest extends TestCase
         $c->renewToken('x');
     }
 
+    public function testRefusedTokenOnDataEndpointsIsAnAuthError(): void
+    {
+        $http = (new F())->on('GET /user/trackers', F::json([], 401))->on('GET /tracker/7/trips', F::json([], 403));
+        $c = new GeorideClient($http, 'https://stub.test');
+        $utc = new \DateTimeZone('UTC');
+        foreach ([fn () => $c->trackers('perime'), fn () => $c->trips('perime', '7', new \DateTimeImmutable('2026-01-01', $utc), new \DateTimeImmutable('2026-01-02', $utc))] as $call) {
+            try {
+                $call();
+                $this->fail();
+            } catch (GeorideException $e) {
+                $this->assertSame(GeorideException::AUTH, $e->getCode());
+            }
+        }
+    }
+
     public function testBadCredentialsAndNetworkErrors(): void
     {
         $c = new GeorideClient((new F())->on('POST /user/login', F::json([], 401)), 'https://stub.test');

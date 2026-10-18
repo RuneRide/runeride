@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace RuneRide\Tests\Trips;
 
+use RuneRide\Auth\LoginThrottle;
 use RuneRide\Fuel\{FranceProvider, FuelSearch, StationRepository};
 use RuneRide\Tests\Support\{DbTestCase, FakeHttpClient as F};
 use RuneRide\Trips\{GeorideAccountRepository, GeorideClient, GeorideSync, SubscriptionRepository, TokenVault, TripRepository, TripService, TripsApi};
@@ -29,6 +30,7 @@ final class TripsApiTest extends DbTestCase
             new TripService($trips, new SubscriptionRepository($this->pdo), 30), $trips, $acc, $client,
             new GeorideSync($client, $acc, $trips, $this->vault, fn () => null), $this->vault,
             new FuelSearch(new FranceProvider($this->http, new StationRepository($this->pdo), 3600, 'https://stub.test/prix')),
+            new LoginThrottle($this->pdo, 3),
         );
     }
 
@@ -52,6 +54,56 @@ final class TripsApiTest extends DbTestCase
         $this->assertTrue($status['lie']);
         $this->assertArrayNotHasKey('password_enc', $status);
         $this->assertSame(['lie' => false], $this->api->georideUnlink($u)[1]);
+    }
+
+    public function testLinkAttemptsAreThrottledPerAccountAndResetBySuccess(): void
+    {
+        $u = $this->makeUser('a@x.fr');
+        $autre = $this->makeUser('b@x.fr');
+        $this->http->on('POST /user/login', F::json([], 401));
+        for ($i = 0; $i < 3; $i++) {
+            $this->assertSame(422, $this->api->georideLink($u, ['email' => 'g@x.fr', 'mot_de_passe' => 'faux'])[0]);
+        }
+        $logins = $this->http->count('POST /user/login');
+        $this->http->on('POST /user/login', F::json(['authToken' => 'tok']));
+        $this->assertSame(429, $this->api->georideLink($u, ['email' => 'g@x.fr', 'mot_de_passe' => 'bon'])[0], 'bloqué même avec le bon mot de passe');
+        $this->assertSame($logins, $this->http->count('POST /user/login'), 'GeoRide n\'est plus interrogé');
+        $this->assertSame(200, $this->api->georideLink($autre, ['email' => 'h@x.fr', 'mot_de_passe' => 'bon'])[0], 'un autre compte RuneRide n\'est pas touché');
+
+        $c = $this->makeUser('c@x.fr');
+        $this->http->on('POST /user/login', F::json([], 401));
+        $this->api->georideLink($c, ['email' => 'g@x.fr', 'mot_de_passe' => 'faux']);
+        $this->api->georideLink($c, ['email' => 'g@x.fr', 'mot_de_passe' => 'faux']);
+        $this->http->on('POST /user/login', F::json(['authToken' => 'tok']));
+        $this->assertSame(200, $this->api->georideLink($c, ['email' => 'g@x.fr', 'mot_de_passe' => 'bon'])[0]);
+        $this->http->on('POST /user/login', F::json([], 401));
+        $this->assertSame(422, $this->api->georideLink($c, ['email' => 'g@x.fr', 'mot_de_passe' => 'faux'])[0]);
+        $this->assertSame(422, $this->api->georideLink($c, ['email' => 'g@x.fr', 'mot_de_passe' => 'faux'])[0], 'le succès a remis le compteur à zéro');
+    }
+
+    public function testGeorideDownTimeDoesNotCountAsAFailedAttempt(): void
+    {
+        $u = $this->makeUser();
+        $this->http->on('POST /user/login', F::json([], 500));
+        for ($i = 0; $i < 5; $i++) {
+            $this->assertSame(502, $this->api->georideLink($u, ['email' => 'g@x.fr', 'mot_de_passe' => 'bon'])[0]);
+        }
+    }
+
+    public function testStatusExposesSessionAndSyncSummary(): void
+    {
+        $u = $this->makeUser();
+        $this->assertSame([false, null, 0], array_values(array_intersect_key($this->api->georideStatus($u)[1], array_flip(['lie', 'session', 'trajets_importes']))));
+        $this->api->georideLink($u, ['email' => 'g@x.fr', 'mot_de_passe' => 'pw']);
+        $acc = new GeorideAccountRepository($this->pdo);
+        $acc->recordSync($u, '2026-05-10 12:00:00', 3, 12);
+        $s = $this->api->georideStatus($u)[1];
+        $this->assertSame(['active', '2026-05-10T12:00:00Z', 3, 12, null], [$s['session'], $s['derniere_synchro'], $s['derniere_synchro_nouveaux'], $s['derniere_synchro_total'], $s['derniere_synchro_erreur']]);
+
+        $acc->recordSyncError($u, 'reseau');
+        $acc->markRelinkRequired($u);
+        $s = $this->api->georideStatus($u)[1];
+        $this->assertSame(['a_relier', 'reseau', 3], [$s['session'], $s['derniere_synchro_erreur'], $s['derniere_synchro_nouveaux']], 'le dernier succès reste visible');
     }
 
     public function testSelectionRequiresKnownBikes(): void

@@ -85,7 +85,10 @@ final class RoutesTest extends DbTestCase
         $u = $this->makeUser();
         $this->assertSame(404, $this->router->dispatch('GET', '/api/inconnu')[0]);
         // Corps JSON simulé via un flux php://input n'étant pas disponible : on teste la couche TripsApi dans TripsApiTest.
-        $this->assertSame(['lie' => false, 'email' => null, 'derniere_synchro' => null, 'motos' => []], $this->call('GET', '/api/georide', $u)[1]);
+        $this->assertSame(
+            ['lie' => false, 'email' => null, 'session' => null, 'derniere_synchro' => null, 'derniere_synchro_nouveaux' => null, 'derniere_synchro_total' => null, 'derniere_synchro_erreur' => null, 'trajets_importes' => 0, 'motos' => []],
+            $this->call('GET', '/api/georide', $u)[1],
+        );
     }
 
     public function testFuelStopsReservedToSubscribers(): void

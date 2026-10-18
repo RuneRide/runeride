@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace RuneRide\Trips;
 
+use RuneRide\Auth\LoginThrottle;
 use RuneRide\Fuel\FuelSearch;
 
 /** Logique des routes JSON authentifiées : chaque méthode reçoit l'identifiant du compte et rend [statut, corps]. */
@@ -16,6 +17,7 @@ final class TripsApi
         private readonly GeorideSync $sync,
         private readonly TokenVault $vault,
         private readonly FuelSearch $fuel,
+        private readonly ?LoginThrottle $throttle = null,
     ) {}
 
     /** @param array<string,mixed> $q @return array{0:int,1:array<string,mixed>} */
@@ -52,7 +54,14 @@ final class TripsApi
         return [200, [
             'lie' => $a !== null,
             'email' => $a['georide_email'] ?? null,
+            // active | a_relier : GeoRide a refusé le jeton ou il a expiré (motos et trajets sont conservés).
+            'session' => $a === null ? null : GeorideSync::sessionState($a),
             'derniere_synchro' => $a === null ? null : Time::iso($a['last_sync_at']),
+            'derniere_synchro_nouveaux' => $a === null || $a['last_sync_new'] === null ? null : (int) $a['last_sync_new'],
+            'derniere_synchro_total' => $a === null || $a['last_sync_total'] === null ? null : (int) $a['last_sync_total'],
+            // Cause du dernier échec (auth, debit, reseau, autre), effacée par la synchro suivante réussie.
+            'derniere_synchro_erreur' => $a['last_sync_error'] ?? null,
+            'trajets_importes' => $a === null ? 0 : $this->tripRepo->count($uid, null),
             'motos' => $this->accounts->trackers($uid),
         ]];
     }
@@ -65,11 +74,21 @@ final class TripsApi
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
             return [422, ['erreur' => 'email et mot de passe GeoRide requis']];
         }
+        // Garde-fou : sans lui, cette route servirait à deviner des mots de passe GeoRide à travers RuneRide.
+        $key = LoginThrottle::key('georide-link', (string) $uid);
+        if ($this->throttle?->blocked($key)) {
+            return [429, ['erreur' => 'essais de liaison GeoRide trop fréquents, réessayez dans quelques minutes']];
+        }
         try {
             $token = $this->georide->login($email, $password);
         } catch (GeorideException $e) {
+            if ($e->getCode() === GeorideException::AUTH) {
+                $this->throttle?->fail($key);
+                return [422, ['erreur' => 'e-mail ou mot de passe GeoRide refusé']];
+            }
             return $this->georideError($e);
         }
+        $this->throttle?->clear($key);
         $existing = $this->accounts->find($uid);
         $start = Time::parse(isset($b['suivi_depuis']) ? (string) $b['suivi_depuis'] : null);
         $this->accounts->save($uid, $email, $this->vault->encrypt($token), $existing['tracking_start_at'] ?? $start);

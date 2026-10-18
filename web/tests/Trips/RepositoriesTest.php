@@ -61,6 +61,17 @@ final class RepositoriesTest extends DbTestCase
         $r->saveToken($u, 'CHIFFRE3', '2026-03-03 00:00:00');
         $a = $r->find($u);
         $this->assertSame(['CHIFFRE3', '2026-03-03 00:00:00'], [$a['token_enc'], $a['token_renewed_at']]);
+        $r->recordSync($u, '2026-02-01 10:00:00', 4, 9);
+        $r->recordSyncError($u, 'auth');
+        $a = $r->find($u);
+        $this->assertSame([4, 9, 'auth', '2026-02-01 10:00:00'], [(int) $a['last_sync_new'], (int) $a['last_sync_total'], $a['last_sync_error'], $a['last_sync_at']]);
+        $r->saveToken($u, 'CHIFFRE4', '2026-03-04 00:00:00');
+        $this->assertSame([], $r->dueForRenewal('2026-03-03 23:59:59'));
+        $this->assertSame([$u], $r->dueForRenewal('2026-03-04 00:00:00'));
+        $r->markRelinkRequired($u);
+        $this->assertSame([], $r->dueForRenewal('2030-01-01 00:00:00'), 'déjà à relier : pas de renouvellement');
+        $r->saveToken($u, 'CHIFFRE5', '2026-03-05 00:00:00');
+        $this->assertSame(0, (int) $r->find($u)['relier_requis'], 'un jeton valide remet le compte en service');
         $r->syncTrackers($u, ['7' => 'Duke', '8' => 'CRF']);
         $r->select($u, ['8']);
         $r->syncTrackers($u, ['7' => 'Duke 790', '9' => 'Neuve']);

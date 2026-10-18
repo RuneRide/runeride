@@ -112,7 +112,13 @@ final class GeorideClient
     private function mustBeOk(HttpResponse $res): void
     {
         if (!$res->ok()) {
-            throw new GeorideException("GeoRide a répondu HTTP {$res->status}", $res->status === 429 ? GeorideException::RATE_LIMIT : GeorideException::OTHER);
+            // 401/403 : GeoRide refuse le jeton (expiré ou révoqué), le client doit relier son compte.
+            $code = match (true) {
+                $res->status === 401, $res->status === 403 => GeorideException::AUTH,
+                $res->status === 429 => GeorideException::RATE_LIMIT,
+                default => GeorideException::OTHER,
+            };
+            throw new GeorideException("GeoRide a répondu HTTP {$res->status}", $code);
         }
     }
 }

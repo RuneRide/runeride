@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace RuneRide\Tests\Trips;
 
+use RuneRide\Http\HttpException;
 use RuneRide\Tests\Support\{DbTestCase, FakeHttpClient as F};
 use RuneRide\Trips\{GeorideAccountRepository, GeorideClient, GeorideException, GeorideSync, TokenVault, TripRepository};
 
@@ -137,6 +138,103 @@ final class GeorideSyncTest extends DbTestCase
         $this->pdo->prepare('UPDATE georide_accounts SET token_enc = NULL WHERE user_id = ?')->execute([$this->uid]);
         $this->expectExceptionCode(GeorideException::AUTH);
         $this->sync->sync($this->uid);
+    }
+
+    public function testSyncReportsPerBikeAndRecordsTheResult(): void
+    {
+        $this->accounts->select($this->uid, ['7']);
+        $r = $this->sync->sync($this->uid, new \DateTimeImmutable('2026-05-10T12:00:00Z'));
+        $this->assertSame([['tracker_id' => '7', 'name' => 'Duke', 'nouveaux' => 2, 'total' => 2]], $r['motos']);
+        $a = $this->accounts->find($this->uid);
+        $this->assertSame([2, 2, null], [(int) $a['last_sync_new'], (int) $a['last_sync_total'], $a['last_sync_error']]);
+        $this->assertSame('2026-05-10 12:00:00', $a['last_sync_at']);
+
+        $r = $this->sync->sync($this->uid, new \DateTimeImmutable('2026-05-11T12:00:00Z'));
+        $this->assertSame([0, 2], [$r['motos'][0]['nouveaux'], $r['motos'][0]['total']], 'rien de nouveau : le rapport le dit');
+        $this->assertSame(0, (int) $this->accounts->find($this->uid)['last_sync_new']);
+    }
+
+    public function testFailuresAreRecordedWithoutTouchingTheLastSuccess(): void
+    {
+        $this->accounts->select($this->uid, ['7']);
+        $this->sync->sync($this->uid, new \DateTimeImmutable('2026-05-10T12:00:00Z'));
+        $day = new \DateTimeImmutable('2026-05-11T12:00:00Z');
+
+        $this->http->on('GET /user/trackers', new HttpException('délai'));
+        try { $this->sync->sync($this->uid, $day); $this->fail(); } catch (GeorideException) {}
+        $a = $this->accounts->find($this->uid);
+        $this->assertSame(['reseau', 0, '2026-05-10 12:00:00'], [$a['last_sync_error'], (int) $a['relier_requis'], $a['last_sync_at']]);
+
+        $this->http->on('GET /user/trackers', F::json([], 429));
+        try { $this->sync->sync($this->uid, $day); $this->fail(); } catch (GeorideException) {}
+        $this->assertSame('debit', $this->accounts->find($this->uid)['last_sync_error']);
+
+        $this->http->on('GET /user/trackers', F::json([], 500));
+        try { $this->sync->sync($this->uid, $day); $this->fail(); } catch (GeorideException) {}
+        $this->assertSame('autre', $this->accounts->find($this->uid)['last_sync_error']);
+
+        $this->http->on('GET /user/trackers', F::json([['trackerId' => 7, 'trackerName' => 'Duke']]));
+        $this->sync->sync($this->uid, $day);
+        $this->assertNull($this->accounts->find($this->uid)['last_sync_error'], 'une synchro réussie efface l\'erreur');
+    }
+
+    public function testRefusedTokenMarksTheAccountToRelinkAndRelinkingClearsIt(): void
+    {
+        $this->accounts->select($this->uid, ['7']);
+        $this->http->on('GET /user/trackers', F::json([], 401));
+        try { $this->sync->sync($this->uid, new \DateTimeImmutable('2026-05-10T12:00:00Z')); $this->fail(); } catch (GeorideException $e) {
+            $this->assertSame(GeorideException::AUTH, $e->getCode());
+        }
+        $a = $this->accounts->find($this->uid);
+        $this->assertSame(['auth', 1, 'a_relier'], [$a['last_sync_error'], (int) $a['relier_requis'], GeorideSync::sessionState($a)]);
+        $this->assertCount(2, $this->accounts->trackers($this->uid), 'les motos sont conservées');
+
+        $this->accounts->save($this->uid, 'g@x.fr', $this->vault->encrypt('tok-neuf'), null);
+        $a = $this->accounts->find($this->uid);
+        $this->assertSame([null, 0, 'active'], [$a['last_sync_error'], (int) $a['relier_requis'], GeorideSync::sessionState($a)]);
+    }
+
+    public function testSessionState(): void
+    {
+        $now = new \DateTimeImmutable('2026-05-31T00:00:00Z');
+        $base = ['relier_requis' => 0, 'token_enc' => 'x', 'token_renewed_at' => '2026-05-10 00:00:00'];
+        $this->assertSame('active', GeorideSync::sessionState($base, $now));
+        $this->assertSame('a_relier', GeorideSync::sessionState(['relier_requis' => 1] + $base, $now));
+        $this->assertSame('a_relier', GeorideSync::sessionState(['token_enc' => null] + $base, $now));
+        $this->assertSame('a_relier', GeorideSync::sessionState(['token_renewed_at' => null] + $base, $now));
+        $this->assertSame('active', GeorideSync::sessionState(['token_renewed_at' => '2026-05-01 00:00:01'] + $base, $now), '29 jours : encore valide');
+        $this->assertSame('a_relier', GeorideSync::sessionState(['token_renewed_at' => '2026-05-01 00:00:00'] + $base, $now), '30 jours : expiré');
+    }
+
+    public function testRenewDueTokensRenewsRefusesAndSkips(): void
+    {
+        $now = new \DateTimeImmutable('2026-05-10T12:00:00Z');
+        $vault = $this->vault;
+        $mk = function (string $email, string $renewedAt, int $relier = 0) use ($vault): int {
+            $u = $this->makeUser($email);
+            $this->accounts->save($u, "$email", $vault->encrypt("tok-$email"), null);
+            $this->accounts->saveToken($u, $vault->encrypt("tok-$email"), $renewedAt);
+            if ($relier) { $this->accounts->markRelinkRequired($u); }
+            return $u;
+        };
+        $this->pdo->exec('DELETE FROM georide_accounts');
+        $due = $mk('due@x.fr', '2026-05-01 00:00:00');
+        $fresh = $mk('fresh@x.fr', '2026-05-09 00:00:00');
+        $refused = $mk('refused@x.fr', '2026-04-01 00:00:00');
+        $skipped = $mk('skipped@x.fr', '2026-04-01 00:00:00', 1);
+        $down = $mk('down@x.fr', '2026-05-02 00:00:00');
+        // Les comptes dus sont traités par identifiant croissant : due, refused, down.
+        $this->http->on('GET /user/new-token', F::json(['authToken' => 'nouveau']), F::json([], 401), new HttpException('délai'));
+
+        $r = $this->sync->renewDueTokens($now);
+        $this->assertSame(['renouveles' => 1, 'a_relier' => 1, 'erreurs' => 1], $r);
+        $this->assertSame(3, $this->http->count('GET /user/new-token'), 'ni le jeton récent ni le compte déjà à relier');
+        $this->assertSame('nouveau', $this->vault->decrypt($this->accounts->find($due)['token_enc']));
+        $this->assertSame('2026-05-10 12:00:00', $this->accounts->find($due)['token_renewed_at']);
+        $this->assertSame(1, (int) $this->accounts->find($refused)['relier_requis']);
+        $this->assertSame(0, (int) $this->accounts->find($down)['relier_requis'], 'une panne GeoRide ne demande pas de relier');
+        $this->assertSame('2026-05-09 00:00:00', $this->accounts->find($fresh)['token_renewed_at']);
+        $this->assertSame(1, (int) $this->accounts->find($skipped)['relier_requis']);
     }
 
     public function testRefreshTrackersKeepsSelection(): void
