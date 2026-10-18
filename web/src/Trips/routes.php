@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 use Doctrine\DBAL\Connection;
 use RuneRide\{Config, Database, Router};
-use RuneRide\Auth\Jwt;
+use RuneRide\Auth\{Jwt, LoginThrottle};
 use RuneRide\Fuel\{FranceProvider, FuelSearch, StationRepository};
 use RuneRide\Http\{CurlHttpClient, HttpClient};
 use RuneRide\Trips\{GeorideAccountRepository, GeorideClient, GeorideSync, SubscriptionRepository, TokenVault, TripRepository, TripService, TripsApi};
@@ -30,6 +30,7 @@ return static function (Router $router, Config $config, Jwt $jwt, ?HttpClient $h
             new GeorideSync($client, $accounts, $tripRepo, $vault),
             $vault,
             new FuelSearch(new FranceProvider($http, new StationRepository($db))),
+            new LoginThrottle($db),
         );
     };
 

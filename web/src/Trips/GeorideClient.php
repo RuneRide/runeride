@@ -23,6 +23,22 @@ final class GeorideClient
         return is_string($token) && $token !== '' ? $token : throw new GeorideException('Jeton GeoRide introuvable dans la réponse');
     }
 
+    /**
+     * Nouveau jeton à partir d'un jeton encore valide (les jetons GeoRide expirent après 30 jours), sans mot de passe.
+     * @throws GeorideException jeton expiré ou refusé (AUTH) ou réponse invalide
+     */
+    public function renewToken(string $token): string
+    {
+        $res = $this->call('GET', '/user/new-token', $token);
+        if ($res->status === 401 || $res->status === 403) {
+            throw new GeorideException('Jeton GeoRide expiré', GeorideException::AUTH);
+        }
+        $this->mustBeOk($res);
+        $data = $res->json();
+        $new = is_array($data) ? ($data['authToken'] ?? $data['token'] ?? null) : null;
+        return is_string($new) && $new !== '' ? $new : throw new GeorideException('Jeton GeoRide introuvable dans la réponse');
+    }
+
     /** @return array<string,string> identifiant => nom de la moto */
     public function trackers(string $token): array
     {
@@ -96,7 +112,13 @@ final class GeorideClient
     private function mustBeOk(HttpResponse $res): void
     {
         if (!$res->ok()) {
-            throw new GeorideException("GeoRide a répondu HTTP {$res->status}", $res->status === 429 ? GeorideException::RATE_LIMIT : GeorideException::OTHER);
+            // 401/403 : GeoRide refuse le jeton (expiré ou révoqué), le client doit relier son compte.
+            $code = match (true) {
+                $res->status === 401, $res->status === 403 => GeorideException::AUTH,
+                $res->status === 429 => GeorideException::RATE_LIMIT,
+                default => GeorideException::OTHER,
+            };
+            throw new GeorideException("GeoRide a répondu HTTP {$res->status}", $code);
         }
     }
 }
