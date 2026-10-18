@@ -1,5 +1,5 @@
 import { get, post, put, del, ecrireJeton, ApiError } from './api.js';
-import { h, bandeau, fmtDateHeure, fmtDate, fmtKm, fmtDuree, fmtEuro } from './dom.js';
+import { h, bandeau, fmtDateHeure, fmtDate, fmtRelatif, fmtKm, fmtDuree, fmtEuro } from './dom.js';
 import { creerCarte, dessinerTrajets, marqueur } from './carte.js';
 import { URL_ABONNEMENT } from './config.js';
 
@@ -127,87 +127,178 @@ export async function vueTrajet(racine, { id }) {
 }
 
 // ---------- GeoRide ----------
+const ERREURS_SYNCHRO = {
+  auth: 'GeoRide a refusé la connexion.',
+  debit: 'GeoRide limitait le débit.',
+  reseau: 'GeoRide était injoignable.',
+  autre: 'GeoRide a répondu de façon inattendue.',
+};
+const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
+
+/** Parcours en trois étapes : relier le compte, choisir les motos, synchroniser. */
+function etapes(actuelle) {
+  const noms = ['Relier le compte', 'Choisir les motos', 'Synchroniser'];
+  return h('ol', { class: 'etapes', 'aria-label': 'Étapes' }, noms.map((nom, i) =>
+    h('li', { class: i + 1 < actuelle ? 'fait' : (i + 1 === actuelle ? 'actif' : null), 'aria-current': i + 1 === actuelle ? 'step' : null }, nom)));
+}
+
+function resumeSynchro(r) {
+  const titre = r.nouveaux > 0
+    ? `${pluriel(r.nouveaux, 'nouveau trajet importé', 'nouveaux trajets importés')}, ${pluriel(r.total, 'trajet vu', 'trajets vus')} chez GeoRide.`
+    : `Rien de nouveau : ${pluriel(r.total, 'trajet vu', 'trajets vus')} chez GeoRide, déjà tous importés.`;
+  return h('div', { class: 'carte' },
+    h('h2', {}, 'Synchronisation terminée'),
+    h('p', {}, titre),
+    r.motos?.length ? h('ul', { class: 'liste' }, r.motos.map((m) =>
+      h('li', { class: 'ligne-moto' }, h('strong', {}, m.name || `Moto ${m.tracker_id}`), h('span', { class: 'muted' }, ` : ${pluriel(m.nouveaux, 'nouveau', 'nouveaux')} sur ${m.total}`)))) : null,
+    h('a', { class: 'btn', href: '#/trajets' }, 'Voir mes trajets'));
+}
+
 export async function vueGeoride(racine) {
   const msg = h('div', { 'aria-live': 'polite' });
+  const resultat = h('div', { 'aria-live': 'polite' });
   const corps = h('div');
-  afficher(racine, h('h1', {}, 'GeoRide'), msg, corps);
+  afficher(racine, h('h1', {}, 'GeoRide'), msg, resultat, corps);
   const dire = (type, texte) => msg.replaceChildren(bandeau(type, texte));
+  let minuteur = null;
+  const arreterMinuteur = () => { if (minuteur) { clearInterval(minuteur); minuteur = null; } };
 
   async function rafraichir() {
     corps.replaceChildren(chargement());
     let etat;
     try { etat = await get('/api/georide'); } catch (e) { afficher(corps, erreurVue(e)); return; }
-    corps.replaceChildren(etat.lie ? vueLie(etat) : vueLiaison());
+    corps.replaceChildren(etat.lie ? vueLie(etat) : h('div', {}, etapes(1), vueLiaison()));
   }
 
-  function vueLiaison() {
-    const email = h('input', { type: 'email', id: 'g-email', required: true, autocomplete: 'username' });
+  /** Formulaire de liaison ; en reconnexion, l'e-mail est prérempli et motos et trajets sont conservés. */
+  function vueLiaison({ email: emailInitial = '', reconnexion = false } = {}) {
+    const email = h('input', { type: 'email', id: 'g-email', required: true, autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false', value: emailInitial });
     const mdp = h('input', { type: 'password', id: 'g-mdp', required: true, autocomplete: 'current-password' });
-    const depuis = h('input', { type: 'date', id: 'g-depuis' });
-    const bouton = h('button', { class: 'btn primaire', type: 'submit' }, 'Lier mon compte');
+    const voir = h('button', { class: 'lien', type: 'button', 'aria-controls': 'g-mdp', 'aria-pressed': 'false' }, 'Afficher le mot de passe');
+    voir.addEventListener('click', () => {
+      const visible = mdp.type === 'password';
+      mdp.type = visible ? 'text' : 'password';
+      voir.textContent = visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
+      voir.setAttribute('aria-pressed', String(visible));
+    });
+    const depuis = reconnexion ? null : h('input', { type: 'date', id: 'g-depuis' });
+    const libelle = reconnexion ? 'Reconnecter' : 'Lier mon compte';
+    const bouton = h('button', { class: 'btn primaire', type: 'submit' }, libelle);
     const form = h('form', { class: 'carte formulaire' },
-      h('p', {}, 'Saisissez vos identifiants GeoRide. Ils servent uniquement à récupérer vos trajets ; votre mot de passe n\'est pas conservé, seul un jeton d\'accès GeoRide l\'est (chiffré). Après une longue absence, il faudra relier le compte.'),
+      h('h2', {}, reconnexion ? 'Reconnecter GeoRide' : 'Relier votre compte GeoRide'),
+      h('p', {}, reconnexion
+        ? 'GeoRide ne reconnaît plus la connexion de RuneRide (accès expiré ou refusé). Saisissez à nouveau votre mot de passe : vos motos et vos trajets importés sont conservés.'
+        : 'Saisissez vos identifiants GeoRide, ceux de l\'application GeoRide. Ils servent uniquement à récupérer vos trajets ; votre mot de passe n\'est pas conservé, seul un jeton d\'accès GeoRide l\'est (chiffré).'),
       h('label', { for: 'g-email' }, 'E-mail GeoRide'), email,
-      h('label', { for: 'g-mdp' }, 'Mot de passe GeoRide'), mdp,
-      h('label', { for: 'g-depuis' }, 'Importer à partir du (facultatif)'), depuis,
+      h('label', { for: 'g-mdp' }, 'Mot de passe GeoRide'), mdp, voir,
+      depuis ? [h('label', { for: 'g-depuis' }, 'Importer à partir du (facultatif)'), depuis,
+        h('p', { class: 'muted petit' }, 'Sans date, RuneRide importe les 30 derniers jours.')] : null,
       bouton);
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      bouton.disabled = true; msg.replaceChildren();
+      bouton.disabled = true; bouton.textContent = 'Vérification auprès de GeoRide…'; msg.replaceChildren();
       try {
         const corpsReq = { email: email.value.trim(), mot_de_passe: mdp.value };
-        if (depuis.value) corpsReq.suivi_depuis = depuis.value;
+        if (depuis?.value) corpsReq.suivi_depuis = depuis.value;
         await put('/api/georide', corpsReq);
-        await get('/api/georide/motos'); // récupère la liste des motos juste après la liaison
-        dire('ok', 'Compte GeoRide lié. Choisissez maintenant les motos à suivre.');
+        mdp.value = '';
+        let avertissement = null;
+        try { await get('/api/georide/motos'); } catch (e2) { if (e2.status === 401) throw e2; avertissement = e2.message; } // liste des motos juste après la liaison
+        if (reconnexion) dire('ok', 'Compte reconnecté. Vos motos et vos trajets sont conservés.');
+        else if (avertissement) dire('info', `Compte lié, mais la liste des motos n'a pas pu être chargée (${avertissement}) Utilisez « Actualiser la liste des motos ».`);
+        else dire('ok', 'Compte GeoRide lié. Choisissez maintenant les motos à suivre.');
         await rafraichir();
-      } catch (e) { if (e.status !== 401) dire('erreur', e.message); bouton.disabled = false; }
+      } catch (e) {
+        if (e.status !== 401) dire('erreur', e.message);
+        bouton.disabled = false; bouton.textContent = libelle; mdp.focus();
+      }
     });
     return form;
   }
 
   function vueLie(etat) {
+    const aRelier = etat.session === 'a_relier';
     const cases = etat.motos.map((m) => {
       const c = h('input', { type: 'checkbox', value: m.tracker_id, checked: m.selected, id: `m-${m.tracker_id}` });
       return h('label', { class: 'case', for: c.id }, c, ' ', m.name || `Moto ${m.tracker_id}`);
     });
+    const choisies = () => cases.map((l) => l.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
     const enregistrer = h('button', { class: 'btn', type: 'button' }, 'Enregistrer la sélection');
     const synchro = h('button', { class: 'btn primaire', type: 'button' }, 'Synchroniser maintenant');
     const actualiser = h('button', { class: 'btn', type: 'button' }, 'Actualiser la liste des motos');
     const delier = h('button', { class: 'btn danger', type: 'button' }, 'Délier GeoRide');
     const reinit = h('button', { class: 'btn danger', type: 'button' }, 'Supprimer mes trajets importés');
+    const tous = [enregistrer, synchro, actualiser, delier, reinit];
+    const majSynchro = () => { synchro.disabled = choisies().length === 0; };
+    cases.forEach((l) => l.querySelector('input').addEventListener('change', majSynchro));
+    majSynchro();
 
-    const occupe = async (btn, fn) => {
-      const boutons = [enregistrer, synchro, actualiser, delier, reinit];
-      boutons.forEach((b) => { b.disabled = true; });
+    const occupe = async (fn) => {
+      tous.forEach((b) => { b.disabled = true; });
       msg.replaceChildren();
       try { await fn(); } catch (e) { if (e.status !== 401) dire('erreur', e.message); }
-      boutons.forEach((b) => { b.disabled = false; });
+      tous.forEach((b) => { b.disabled = false; });
+      majSynchro();
     };
-    const choisies = () => cases.map((l) => l.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
 
-    enregistrer.addEventListener('click', () => occupe(enregistrer, async () => { await put('/api/georide/motos', { motos: choisies() }); dire('ok', 'Sélection enregistrée.'); }));
-    actualiser.addEventListener('click', () => occupe(actualiser, async () => { await get('/api/georide/motos'); await rafraichir(); }));
-    synchro.addEventListener('click', () => occupe(synchro, async () => {
+    enregistrer.addEventListener('click', () => occupe(async () => { await put('/api/georide/motos', { motos: choisies() }); dire('ok', 'Sélection enregistrée.'); await rafraichir(); }));
+    actualiser.addEventListener('click', () => occupe(async () => { await get('/api/georide/motos'); await rafraichir(); }));
+    synchro.addEventListener('click', () => occupe(async () => {
+      resultat.replaceChildren();
       await put('/api/georide/motos', { motos: choisies() });
-      const r = await post('/api/georide/synchronisation');
-      dire('ok', `Synchronisation terminée : ${r.nouveaux} nouveau${r.nouveaux > 1 ? 'x' : ''} trajet${r.nouveaux > 1 ? 's' : ''}, ${r.total} au total.`);
+      // Le serveur ne publie pas de progression : on montre une barre indéterminée et le temps écoulé.
+      const debut = Date.now();
+      const duree = h('span', { class: 'muted' }, '0 s');
+      resultat.replaceChildren(bandeau('info',
+        h('strong', {}, 'Synchronisation en cours… '), duree, h('br'),
+        'Les trajets et leurs tracés sont récupérés un par un : cela peut prendre une minute.',
+        h('progress', { 'aria-label': 'Synchronisation en cours' })));
+      minuteur = setInterval(() => { duree.textContent = `${Math.round((Date.now() - debut) / 1000)} s`; }, 1000);
+      try {
+        resultat.replaceChildren(resumeSynchro(await post('/api/georide/synchronisation')));
+      } catch (e) {
+        resultat.replaceChildren();
+        await rafraichir(); // l'état affiché suit le serveur (par exemple « à reconnecter »)
+        throw e;
+      } finally { arreterMinuteur(); }
       await rafraichir();
     }));
-    delier.addEventListener('click', () => { if (confirm('Délier votre compte GeoRide ? Vos trajets déjà importés sont conservés.')) occupe(delier, async () => { await del('/api/georide'); await rafraichir(); }); });
-    reinit.addEventListener('click', () => { if (confirm('Supprimer tous vos trajets importés ? Une nouvelle synchronisation les réimportera.')) occupe(reinit, async () => { const r = await del('/api/trajets'); dire('ok', `${r.supprimes} trajet(s) supprimé(s).`); }); });
+    delier.addEventListener('click', () => { if (confirm('Délier votre compte GeoRide ? Le jeton mémorisé est supprimé ; vos trajets déjà importés sont conservés.')) occupe(async () => { resultat.replaceChildren(); await del('/api/georide'); await rafraichir(); }); });
+    reinit.addEventListener('click', () => { if (confirm('Supprimer tous vos trajets importés ? Une nouvelle synchronisation les réimportera.')) occupe(async () => { const r = await del('/api/trajets'); dire('ok', `${r.supprimes} trajet(s) supprimé(s).`); await rafraichir(); }); });
 
-    return h('div', { class: 'carte' },
-      h('p', {}, 'Compte lié : ', h('strong', {}, etat.email)),
-      h('p', { class: 'muted' }, etat.derniere_synchro ? `Dernière synchronisation : ${fmtDateHeure(etat.derniere_synchro)}` : 'Jamais synchronisé.'),
-      h('h2', {}, 'Motos suivies'),
-      cases.length ? h('div', { class: 'cases' }, cases) : h('p', { class: 'muted' }, 'Aucune moto connue. Actualisez la liste.'),
-      h('div', { class: 'actions' }, enregistrer, synchro, actualiser),
-      h('hr'),
-      h('div', { class: 'actions' }, delier, reinit));
+    const suivies = etat.motos.filter((m) => m.selected);
+    const etape = aRelier ? 1 : (suivies.length ? 3 : 2);
+    const derniere = etat.derniere_synchro
+      ? `Dernière synchronisation ${fmtRelatif(etat.derniere_synchro)} (${fmtDateHeure(etat.derniere_synchro)})${etat.derniere_synchro_total === null ? '.' : ` : ${pluriel(etat.derniere_synchro_nouveaux, 'nouveau trajet', 'nouveaux trajets')} sur ${etat.derniere_synchro_total}.`}`
+      : 'Jamais synchronisé.';
+    const statut = h('div', { class: 'carte' },
+      h('p', { class: 'statut' },
+        h('span', { class: `pastille ${aRelier ? 'alerte' : 'ok'}` }, aRelier ? 'À reconnecter' : 'Connecté'), h('strong', {}, etat.email)),
+      h('dl', { class: 'stats' },
+        h('div', {}, h('dt', {}, 'Trajets importés'), h('dd', {}, etat.trajets_importes)),
+        h('div', {}, h('dt', {}, 'Motos suivies'), h('dd', {}, suivies.length ? suivies.map((m) => m.name || m.tracker_id).join(', ') : 'Aucune'))),
+      h('p', { class: 'muted' }, derniere),
+      etat.derniere_synchro_erreur && !aRelier
+        ? bandeau('erreur', `La dernière tentative a échoué : ${ERREURS_SYNCHRO[etat.derniere_synchro_erreur] ?? ERREURS_SYNCHRO.autre} Réessayez dans un moment.`) : null,
+      etat.trajets_importes > 0 ? h('a', { href: '#/trajets' }, 'Voir mes trajets') : null);
+
+    const danger = h('div', { class: 'actions' }, delier, reinit);
+    if (aRelier) {
+      return h('div', {}, etapes(etape), statut, vueLiaison({ email: etat.email, reconnexion: true }),
+        suivies.length || cases.length ? h('p', { class: 'muted' }, `Motos conservées : ${cases.length ? etat.motos.map((m) => m.name || m.tracker_id).join(', ') : 'aucune'}.`) : null,
+        h('hr'), danger);
+    }
+    return h('div', {}, etapes(etape), statut,
+      h('div', { class: 'carte' },
+        h('h2', {}, 'Motos suivies'),
+        cases.length ? h('div', { class: 'cases' }, cases) : h('p', { class: 'muted' }, 'Aucune moto connue. Actualisez la liste.'),
+        suivies.length === 0 && cases.length ? h('p', { class: 'muted petit' }, 'Cochez au moins une moto pour lancer la synchronisation.') : null,
+        h('div', { class: 'actions' }, enregistrer, synchro, actualiser),
+        h('hr'), danger));
   }
 
   await rafraichir();
+  return arreterMinuteur;
 }
 
 // ---------- Ravitaillement (pit-stop) ----------

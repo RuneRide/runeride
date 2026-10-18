@@ -19,6 +19,17 @@ const dateHeure = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeSt
 const dateSeule = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' });
 export const fmtDateHeure = (iso) => (iso ? dateHeure.format(new Date(iso)) : '—');
 export const fmtDate = (iso) => (iso ? dateSeule.format(new Date(iso)) : '—');
+const relatif = new Intl.RelativeTimeFormat('fr-FR', { numeric: 'auto' });
+/** « il y a 2 heures », « hier »… ; sous la minute : « à l'instant ». */
+export function fmtRelatif(iso, maintenant = Date.now()) {
+  if (!iso) return '—';
+  const s = Math.round((new Date(iso).getTime() - maintenant) / 1000);
+  const a = Math.abs(s);
+  if (a < 60) return 'à l\'instant';
+  if (a < 3600) return relatif.format(Math.round(s / 60), 'minute');
+  if (a < 86400) return relatif.format(Math.round(s / 3600), 'hour');
+  return relatif.format(Math.round(s / 86400), 'day');
+}
 export const fmtKm = (km) => `${Number(km).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`;
 export function fmtDuree(min) {
   const m = Math.round(min);

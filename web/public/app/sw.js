@@ -1,5 +1,5 @@
 // Service worker de RuneRide (portée /app/) : met l'interface en cache, jamais les réponses de l'API.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `runeride-app-${VERSION}`;
 const SHELL = [
   './', 'index.html', 'app.css', 'manifest.webmanifest',
