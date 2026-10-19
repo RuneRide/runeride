@@ -35,6 +35,15 @@ final class JwtTest extends TestCase
         $this->assertNull((new Jwt(self::$pem, 'https://autre', 'runeride'))->verify($tok), 'autre émetteur');
     }
 
+    public function testIssueForAnotherAudienceKeepsProtectedClaims(): void
+    {
+        $jwt = new Jwt(self::$pem, 'https://runeride.fr', 'runeride');
+        $tok = $jwt->issueFor('abc', 'raido', ['palier' => 'gratuit', 'sub' => 'pirate', 'aud' => 'runeride', 'exp' => 9_999_999_999], 60, 1000);
+        $this->assertNull($jwt->verify($tok, 1001), 'pas un jeton de session');
+        $claims = (new Jwt(self::$pem, 'https://runeride.fr', 'raido'))->verify($tok, 1001);
+        $this->assertSame(['iss' => 'https://runeride.fr', 'aud' => 'raido', 'sub' => 'abc', 'iat' => 1000, 'exp' => 1060, 'palier' => 'gratuit'], $claims);
+    }
+
     public function testJwksExposesPublicKeyOnly(): void
     {
         $key = (new Jwt(self::$pem, 'i', 'a'))->jwks()['keys'][0];

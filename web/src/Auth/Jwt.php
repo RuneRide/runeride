@@ -24,9 +24,19 @@ final class Jwt
 
     public function issue(int $userId, int $ttl = 3600, ?int $now = null): string
     {
+        return $this->issueFor((string) $userId, $this->audience, [], $ttl, $now);
+    }
+
+    /**
+     * Jeton pour une autre audience (un service comme Raido) avec des revendications supplémentaires ;
+     * iss, aud, sub, iat et exp ne peuvent pas être écrasés. verify() ne l'accepte pas : il est fait pour le service visé.
+     * @param array<string,mixed> $extra
+     */
+    public function issueFor(string $subject, string $audience, array $extra, int $ttl, ?int $now = null): string
+    {
         $now ??= time();
         $header = ['alg' => 'RS256', 'typ' => 'JWT', 'kid' => $this->kid];
-        $claims = ['iss' => $this->issuer, 'aud' => $this->audience, 'sub' => (string) $userId, 'iat' => $now, 'exp' => $now + $ttl];
+        $claims = ['iss' => $this->issuer, 'aud' => $audience, 'sub' => $subject, 'iat' => $now, 'exp' => $now + $ttl] + $extra;
         $signing = self::b64(json_encode($header)) . '.' . self::b64(json_encode($claims));
         openssl_sign($signing, $sig, $this->private, OPENSSL_ALGO_SHA256);
         return $signing . '.' . self::b64($sig);
