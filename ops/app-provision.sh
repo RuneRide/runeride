@@ -22,7 +22,7 @@
 # Prérequis : aws (accès à Secrets Manager), curl, jq, openssl, awk.
 set -euo pipefail
 
-SECRET_ID="runeride/cpanel"; REGION="eu-north-1"; ROOT_DOMAIN="runeride.fr"; FQDN="app.runeride.fr"
+SECRET_ID="runeride/cpanel"; REGION="eu-north-1"; FQDN="app.runeride.fr"
 APP_DIR="app"; DB_SUFFIX="runeride"; DBUSER_SUFFIX="rride"
 
 APPLY=0; MIGRATE=0; FORCE_ENV=0

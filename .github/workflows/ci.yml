@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: EUPL-1.2
+# Vérifications sur chaque pull request (et à la demande) : tests PHP avec MariaDB, syntaxe des
+# scripts shell et JavaScript. Ne déploie rien (voir deploy-app.yml pour le déploiement depuis main).
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php:
+    name: Tests PHP (MariaDB)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: runeride_test
+          MARIADB_USER: runeride
+          MARIADB_PASSWORD: runeride
+          MARIADB_ROOT_PASSWORD: root
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@2.31.1
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_mysql, curl, openssl, sodium
+          tools: composer:v2
+      - run: composer install --prefer-dist --no-progress
+      - name: PHPUnit (migrations jouées sur la base de test)
+        env:
+          RUNERIDE_TEST_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=runeride_test;charset=utf8mb4'
+          RUNERIDE_TEST_USER: runeride
+          RUNERIDE_TEST_PASSWORD: runeride
+        run: vendor/bin/phpunit
+
+  scripts:
+    name: Scripts shell et JavaScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck (ops/)
+        run: shellcheck -S warning ops/*.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntaxe JavaScript (web/public)
+        run: |
+          set -e
+          find web/public -name '*.js' -not -path '*/vendor/*' -print0 | xargs -0 -n1 node --check
