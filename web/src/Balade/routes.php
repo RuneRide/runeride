@@ -4,7 +4,7 @@ declare(strict_types=1);
 use Doctrine\DBAL\Connection;
 use RuneRide\{Config, Database, Router};
 use RuneRide\Auth\Jwt;
-use RuneRide\Balade\{BaladeApi, QuotaRepository};
+use RuneRide\Balade\{BaladeApi, BaladeRepository, QuotaRepository};
 use RuneRide\Trips\SubscriptionRepository;
 
 /**
@@ -23,6 +23,8 @@ return static function (Router $router, Config $config, Jwt $jwt, ?Connection $d
             max(1, (int) $config->get('RUNERIDE_BALADE_LIMITE_KM', '25')),
             max(0, (int) $config->get('RUNERIDE_BALADE_GRANDS_PAR_MOIS', '3')),
             $config->get('RUNERIDE_RAIDO_URL', '') ?: null,
+            new BaladeRepository($db),
+            max(0, (int) $config->get('RUNERIDE_BALADE_ENREGISTREES_GRATUIT', '5')),
         );
     };
 
@@ -35,7 +37,7 @@ return static function (Router $router, Config $config, Jwt $jwt, ?Connection $d
             }
             $raw = json_decode((string) file_get_contents('php://input'), true);
             try {
-                return $action($api(), (int) $claims['sub'], is_array($raw) ? $raw : []);
+                return $action($api(), (int) $claims['sub'], is_array($raw) ? $raw : [], $_GET);
             } catch (\Throwable $e) {
                 error_log('[runeride/balade] ' . $e::class . ': ' . $e->getMessage());
                 return [500, ['erreur' => 'erreur interne']];
@@ -45,4 +47,19 @@ return static function (Router $router, Config $config, Jwt $jwt, ?Connection $d
 
     $router->add('POST', '/api/balade/jeton', $guard(fn (BaladeApi $a, int $u, array $b) => $a->token($u, $b)));
     $router->add('GET', '/api/balade/quota', $guard(fn (BaladeApi $a, int $u) => $a->quota($u)));
+    $router->add('GET', '/api/balades', $guard(fn (BaladeApi $a, int $u, array $b, array $q) => $a->list($u, $q)));
+    $router->add('GET', '/api/balade', $guard(fn (BaladeApi $a, int $u, array $b, array $q) => $a->detail($u, $q)));
+    $router->add('POST', '/api/balades', $guard(fn (BaladeApi $a, int $u, array $b) => $a->save($u, $b)));
+    $router->add('DELETE', '/api/balades', $guard(fn (BaladeApi $a, int $u, array $b, array $q) => $a->delete($u, $q)));
+    $router->add('PUT', '/api/balade/partage', $guard(fn (BaladeApi $a, int $u, array $b) => $a->share($u, $b)));
+    $router->add('DELETE', '/api/balade/partage', $guard(fn (BaladeApi $a, int $u, array $b, array $q) => $a->unshare($u, $q)));
+    // Lecture publique d'une balade partagée : sans jeton, par sa clé seule.
+    $router->add('GET', '/api/balade/partage', static function () use ($api) {
+        try {
+            return $api()->shared($_GET);
+        } catch (\Throwable $e) {
+            error_log('[runeride/balade] ' . $e::class . ': ' . $e->getMessage());
+            return [500, ['erreur' => 'erreur interne']];
+        }
+    });
 };
