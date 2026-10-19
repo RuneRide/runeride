@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN partage_traces TINYINT(1) NOT NULL DEFAULT 0;

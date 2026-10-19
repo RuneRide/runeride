@@ -30,6 +30,7 @@ final class BaladeApi
         private readonly ?string $raidoUrl = null,
         private readonly ?BaladeRepository $balades = null,
         private readonly int $savedFree = 5,
+        private readonly ?PreferencesRepository $prefs = null,
     ) {}
 
     /**
@@ -213,6 +214,91 @@ final class BaladeApi
         }
         unset($b['id'], $b['partagee'], $b['modifiee_le']);
         return [200, $b + ['attribution' => self::ATTRIBUTION]];
+    }
+
+    // ---------- Préférences de balade (spec §7.3, migration 015) et opt-in de partage des traces (§9, migration 013) ----------
+
+    /** Valeurs appliquées quand rien n'est enregistré ; Raido les reçoit dans le corps de chaque requête (il reste sans état). */
+    public const DEFAULT_PAUSE_MIN_PER_H = 10;
+    public const DEFAULT_WEATHER = ['pluie_mmh' => 1.0, 'rafales_kmh' => 60.0, 'froid_c' => 5.0];
+    /** Classes de route du moteur (raido-format::Classe) dont la vitesse moyenne peut être réglée, en km/h. */
+    public const SPEED_CLASSES = ['autoroute', 'nationale', 'primaire', 'secondaire', 'tertiaire', 'non_classee', 'residentielle'];
+    private const WEATHER_RANGES = ['pluie_mmh' => [0.0, 20.0], 'rafales_kmh' => [20.0, 150.0], 'froid_c' => [-20.0, 25.0]];
+
+    /** GET /api/balade/preferences @return array{0:int,1:array<string,mixed>} */
+    public function preferences(int $uid): array
+    {
+        $p = $this->prefsRepo()->find($uid);
+        return [200, [
+            'vitesses' => $p['vitesses'] ?? null,
+            'pause_min_par_h' => $p['pause_min_par_h'] ?? self::DEFAULT_PAUSE_MIN_PER_H,
+            'seuils_meteo' => array_map(floatval(...), ($p['seuils_meteo'] ?? []) + self::DEFAULT_WEATHER),
+            'calibration' => $p['calibration'] ?? null,
+            'classes' => self::SPEED_CLASSES,
+            'partage_traces' => $this->prefsRepo()->sharesTraces($uid),
+        ]];
+    }
+
+    /**
+     * PUT /api/balade/preferences : vitesses (objet classe → km/h entre 20 et 130, ou null = défauts du moteur),
+     * pause_min_par_h (0 à 30), seuils_meteo (pluie_mmh, rafales_kmh, froid_c, tous facultatifs). La calibration n'est pas modifiable ici.
+     * @param array<string,mixed> $body
+     */
+    public function savePreferences(int $uid, array $body): array
+    {
+        $speeds = $body['vitesses'] ?? null;
+        if ($speeds !== null) {
+            if (!is_array($speeds) || $speeds === [] || array_is_list($speeds)) {
+                return [422, ['erreur' => 'vitesses attendu : objet classe → km/h, ou null', 'code' => 'vitesses_invalides']];
+            }
+            foreach ($speeds as $class => $v) {
+                if (!in_array($class, self::SPEED_CLASSES, true) || !is_int($v) && !is_float($v) || $v < 20 || $v > 130) {
+                    return [422, ['erreur' => 'vitesses : classe connue et vitesse entre 20 et 130 km/h', 'code' => 'vitesses_invalides']];
+                }
+                $speeds[$class] = (int) round($v);
+            }
+        }
+        $pause = $body['pause_min_par_h'] ?? self::DEFAULT_PAUSE_MIN_PER_H;
+        if (!is_int($pause) || $pause < 0 || $pause > 30) {
+            return [422, ['erreur' => 'pause_min_par_h attendu : entier de 0 à 30', 'code' => 'pause_invalide']];
+        }
+        $thr = $body['seuils_meteo'] ?? null;
+        if ($thr !== null) {
+            if (!is_array($thr) || array_is_list($thr) && $thr !== []) {
+                return [422, ['erreur' => 'seuils_meteo attendu : objet', 'code' => 'seuils_invalides']];
+            }
+            foreach ($thr as $k => $v) {
+                if (!isset(self::WEATHER_RANGES[$k]) || !is_int($v) && !is_float($v) || $v < self::WEATHER_RANGES[$k][0] || $v > self::WEATHER_RANGES[$k][1]) {
+                    return [422, ['erreur' => 'seuils_meteo : pluie_mmh (0-20), rafales_kmh (20-150), froid_c (-20-25)', 'code' => 'seuils_invalides']];
+                }
+                $thr[$k] = (float) $v;
+            }
+            $thr = $thr === [] ? null : $thr;
+        }
+        $this->prefsRepo()->save($uid, $speeds, $pause, $thr);
+        return $this->preferences($uid);
+    }
+
+    /** DELETE /api/balade/preferences : retour aux valeurs par défaut. */
+    public function resetPreferences(int $uid): array
+    {
+        $this->prefsRepo()->delete($uid);
+        return $this->preferences($uid);
+    }
+
+    /** PUT /api/balade/partage-traces {actif: bool} : opt-in du score motard, retrait immédiat par bascule (§9). @param array<string,mixed> $body */
+    public function setTraceSharing(int $uid, array $body): array
+    {
+        if (!is_bool($body['actif'] ?? null)) {
+            return [422, ['erreur' => 'actif attendu : booléen', 'code' => 'actif_invalide']];
+        }
+        $this->prefsRepo()->setSharesTraces($uid, $body['actif']);
+        return [200, ['partage_traces' => $body['actif']]];
+    }
+
+    private function prefsRepo(): PreferencesRepository
+    {
+        return $this->prefs ?? throw new \LogicException('PreferencesRepository absent');
     }
 
     private function savedLimit(string $tier): ?int
