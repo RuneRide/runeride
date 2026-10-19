@@ -10,7 +10,7 @@ set -euo pipefail
 
 SECRET_ID="runeride/cpanel"; REGION="eu-north-1"
 MODE=logs; N=25; LSDIR=app
-if [[ "${1:-}" == "--ls" ]]; then MODE=ls; LSDIR="${2:-app}"; else N="${1:-25}"; fi
+if [[ "${1:-}" == "--ls" ]]; then MODE="ls"; LSDIR="${2:-app}"; else N="${1:-25}"; fi
 secret=$(aws secretsmanager get-secret-value --region "$REGION" --secret-id "$SECRET_ID" --query SecretString --output text)
 pick() { jq -r --arg keys "$1" '[ ($keys | split(",")[]) as $k | .[$k]? | select(. != null and . != "") ] | first // empty' <<<"$secret"; }
 host=$(pick host,hostname,server,url,cpanel_host); user=$(pick user,username,login,cpanel_user); token=$(pick token,api_token,apitoken,key,secret)
