@@ -71,7 +71,8 @@ final class BaladeRoutesTest extends DbTestCase
         $claims = $this->raido->verify($out['jeton'], $now + 899);
         $this->assertNotNull($claims, 'accepté par le vérificateur à audience raido');
         $this->assertSame(['iss' => 'https://app.test', 'aud' => 'raido', 'sub' => BaladeApi::subject($u), 'iat' => $now, 'exp' => $now + 900, 'palier' => 'gratuit', 'type' => 'petite_boucle', 'limite_km' => 25], $claims);
-        $this->assertStringNotContainsString((string) $u, $claims['sub'], 'sujet opaque');
+        $this->assertMatchesRegularExpression('/^u[0-9a-f]{24}$/', $claims['sub'], 'sujet opaque, jamais l\'identifiant du compte');
+        $this->assertNotSame((string) $u, $claims['sub']);
         $this->assertNull($this->raido->verify($out['jeton'], $now + 901), 'expiré après 15 minutes');
         $this->assertNull($this->jwt->verify($out['jeton'], $now), 'refusé comme jeton de session (audience runeride)');
         for ($i = 0; $i < 5; $i++) {
