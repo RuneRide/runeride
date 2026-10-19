@@ -54,6 +54,7 @@ $router->add('GET', '/api/moi', function () use ($jwt, $config) {
 });
 
 (require __DIR__ . '/../src/Trips/routes.php')($router, $config, $jwt); // trajets GeoRide, motos, ravitaillement
+(require __DIR__ . '/../src/Balade/routes.php')($router, $config, $jwt); // calculateur de balade Raido : jeton court et quota
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 [$status, $out] = $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $path);
