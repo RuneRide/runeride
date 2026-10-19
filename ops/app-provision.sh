@@ -72,10 +72,20 @@ if [[ $MIGRATE -eq 1 ]]; then
   cmd="cd $home/$APP_DIR && sh -c 'for p in /opt/cpanel/ea-php84/root/usr/bin/php /opt/cpanel/ea-php83/root/usr/bin/php /opt/alt/php84/usr/bin/php /opt/alt/php83/usr/bin/php /usr/local/bin/php /usr/bin/php; do if [ -x \$p ]; then \$p bin/cle-jwt; \$p bin/migrer; echo FIN; exit 0; fi; done; echo AUCUN_PHP' > $log 2>&1"
   echo "== Phase 2 : clé JWT et migrations par tâche cron éphémère =="
   [[ $APPLY -eq 1 || $MIGRATE -eq 1 ]] || exit 0
-  add=$(uapi Cron/add_line "command=$cmd" "minute=*" "hour=*" "day=*" "month=*" "weekday=*"); ok "$add" || fail Cron/add_line "$add"
-  linekey=$(jq -r '.data.linekey // empty' <<<"$add")
-  cleanup() { [[ -n "${linekey:-}" ]] && uapi Cron/remove_line "linekey=$linekey" >/dev/null 2>&1 && echo "tâche cron supprimée" || true; }
+  # Le module UAPI Cron n'existe pas sur o2switch : on passe par l'API2 (réponse {"cpanelresult":{"event":{"result":1},"data":[…]}})
+  api2_ok() { jq -e '.cpanelresult.event.result == 1 and ((.cpanelresult.data // []) | map(select(.status == 0)) | length) == 0' >/dev/null 2>&1 <<<"$1"; }
+  add=$(api2 Cron add_line "command=$cmd" "minute=*" "hour=*" "day=*" "month=*" "weekday=*"); api2_ok "$add" || { echo "Échec cPanel (Cron/add_line) :" >&2; jq -r '(.cpanelresult.data[0].statusmsg // .cpanelresult.error // "réponse inattendue")' <<<"$add" >&2; exit 1; }
+  linekey=$(jq -r '.cpanelresult.data[0].linekey // empty' <<<"$add")
+  cleanup() {
+    [[ -n "${linekey:-}" ]] && api2 Cron remove_line "linekey=$linekey" >/dev/null 2>&1 || true
+    # Vérification : aucune tâche ne doit rester ; sinon suppression par numéro de ligne
+    local liste n; liste=$(api2 Cron listcron 2>/dev/null || true)
+    n=$(jq -r '[.cpanelresult.data[]? | select((.command // "") | contains("bin/migrer")) | .line] | first // empty' <<<"$liste" 2>/dev/null || true)
+    [[ -n "$n" ]] && api2 Cron remove_line "line=$n" >/dev/null 2>&1 || true
+    echo "tâche cron supprimée"
+  }
   trap cleanup EXIT
+  api2 Fileman fileop "op=unlink" "sourcefiles=$home/$APP_DIR/$log" "doubledecode=0" >/dev/null 2>&1 || true  # sinon un ancien journal (avec FIN) ferait croire que la tâche a déjà tourné
   echo "tâche planifiée, attente de son exécution (jusqu'à 3 minutes)…"
   out=""
   for _ in $(seq 1 18); do
