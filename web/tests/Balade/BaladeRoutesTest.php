@@ -51,7 +51,7 @@ final class BaladeRoutesTest extends DbTestCase
     {
         $this->assertSame(401, $this->call('POST', '/api/balade/jeton', null)[0]);
         $this->assertSame(401, $this->call('GET', '/api/balade/quota', null)[0]);
-        foreach ([['GET', '/api/balade/preferences'], ['PUT', '/api/balade/preferences'], ['DELETE', '/api/balade/preferences'], ['PUT', '/api/balade/partage-traces']] as [$m, $p]) {
+        foreach ([['GET', '/api/balade/troncons'], ['GET', '/api/balade/preferences'], ['PUT', '/api/balade/preferences'], ['DELETE', '/api/balade/preferences'], ['PUT', '/api/balade/partage-traces']] as [$m, $p]) {
             $this->assertSame(401, $this->call($m, $p, null)[0], "$m $p");
         }
         $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $this->raido->issue(1);

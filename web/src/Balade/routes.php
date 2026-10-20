@@ -4,7 +4,7 @@ declare(strict_types=1);
 use Doctrine\DBAL\Connection;
 use RuneRide\{Config, Database, Router};
 use RuneRide\Auth\Jwt;
-use RuneRide\Balade\{BaladeApi, BaladeRepository, PreferencesRepository, QuotaRepository};
+use RuneRide\Balade\{BaladeApi, BaladeRepository, PreferencesRepository, QuotaRepository, TronconRepository};
 use RuneRide\Trips\SubscriptionRepository;
 
 /**
@@ -26,6 +26,7 @@ return static function (Router $router, Config $config, Jwt $jwt, ?Connection $d
             new BaladeRepository($db),
             max(0, (int) $config->get('RUNERIDE_BALADE_ENREGISTREES_GRATUIT', '5')),
             new PreferencesRepository($db),
+            new TronconRepository($db),
         );
     };
 
@@ -54,6 +55,7 @@ return static function (Router $router, Config $config, Jwt $jwt, ?Connection $d
     $router->add('DELETE', '/api/balades', $guard(fn (BaladeApi $a, int $u, array $b, array $q) => $a->delete($u, $q)));
     $router->add('PUT', '/api/balade/partage', $guard(fn (BaladeApi $a, int $u, array $b) => $a->share($u, $b)));
     $router->add('DELETE', '/api/balade/partage', $guard(fn (BaladeApi $a, int $u, array $b, array $q) => $a->unshare($u, $q)));
+    $router->add('GET', '/api/balade/troncons', $guard(fn (BaladeApi $a, int $u, array $b, array $q) => $a->knownSegments($u, $q)));
     $router->add('GET', '/api/balade/preferences', $guard(fn (BaladeApi $a, int $u) => $a->preferences($u)));
     $router->add('PUT', '/api/balade/preferences', $guard(fn (BaladeApi $a, int $u, array $b) => $a->savePreferences($u, $b)));
     $router->add('DELETE', '/api/balade/preferences', $guard(fn (BaladeApi $a, int $u) => $a->resetPreferences($u)));
