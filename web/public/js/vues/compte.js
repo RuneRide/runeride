@@ -3,6 +3,7 @@ import { h, fmtRelatif, fmtDateHeure, toast, squelette, bandeau } from '../dom.j
 import { icone } from '../icones.js';
 import { URL_ABONNEMENT } from '../config.js';
 import { afficher, erreurVue } from './commun.js';
+import { sectionBalade } from './compte-balade.js';
 
 const nouveaux = (n) => `${n} nouveau${n > 1 ? 'x' : ''} trajet${n > 1 ? 's' : ''}`;
 const supprimes = (n) => `${n} trajet${n > 1 ? 's' : ''} supprimé${n > 1 ? 's' : ''}`;
@@ -27,6 +28,7 @@ export async function vueCompte(racine, { aller }) {
   afficher(racine,
     h('div', { class: 'titre-page' }, h('h1', {}, 'Compte'), h('p', {}, 'Reliez votre moto GeoRide pour retrouver vos trajets sur la carte.')),
     h('section', { class: 'bloc', 'aria-labelledby': 'h-georide' }, h('div', { class: 'entete-bloc' }, h('h2', { id: 'h-georide' }, 'GeoRide'), etatGeoride), contenu),
+    h('section', { class: 'bloc', 'aria-labelledby': 'h-balade' }, h('div', { class: 'entete-bloc' }, h('h2', { id: 'h-balade' }, 'Balade')), sectionBalade()),
     h('section', { class: 'bloc', 'aria-labelledby': 'h-session' }, h('h2', { id: 'h-session' }, 'Session'),
       h('p', { class: 'muted' }, 'Gratuit : historique récent. ', h('a', { href: URL_ABONNEMENT }, 'Voir les abonnements')),
       sortie));
