@@ -1,0 +1,8 @@
+CREATE TABLE trajets_apparies (
+    trip_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    graph_version VARCHAR(64) NULL,
+    couverture DOUBLE NOT NULL DEFAULT 0,
+    points INT UNSIGNED NOT NULL DEFAULT 0,
+    matched_at DATETIME NOT NULL,
+    CONSTRAINT fk_apparies_trip FOREIGN KEY (trip_id) REFERENCES trips (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

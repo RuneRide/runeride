@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace RuneRide\Balade;
 
 use Doctrine\DBAL\Connection;
+use RuneRide\Trips\Time;
 
 /**
  * Tronçons du réseau déjà parcourus par un trajet (trajets_troncons, migration 012), rangés par l'appariement des
@@ -58,6 +59,22 @@ final class TronconRepository
             [$userId, $graphVersion],
         );
         return array_map(static fn (array $r) => [(int) $r[0], (int) $r[1]], $rows);
+    }
+
+    /** Trajets du compte pas encore passés à l'appariement (le plus récent d'abord), au plus $limit. @return list<int> */
+    public function pendingTrips(int $userId, int $limit): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn(
+            'SELECT t.id FROM trips t LEFT JOIN trajets_apparies a ON a.trip_id = t.id WHERE t.user_id = ? AND a.trip_id IS NULL AND t.points_count > 2 ORDER BY t.started_at DESC, t.id DESC LIMIT ' . max(1, $limit),
+            [$userId],
+        ));
+    }
+
+    /** Note qu'un trajet a été apparié (ou jugé inapparentable : couverture 0), pour ne pas le renvoyer à chaque synchronisation. */
+    public function markMatched(int $tripId, ?string $graphVersion, float $coverage, int $points): void
+    {
+        $this->db->executeStatement('DELETE FROM trajets_apparies WHERE trip_id = ?', [$tripId]);
+        $this->db->insert('trajets_apparies', ['trip_id' => $tripId, 'graph_version' => $graphVersion, 'couverture' => $coverage, 'points' => $points, 'matched_at' => Time::now()]);
     }
 
     /** Versions de graphe pour lesquelles le compte a des tronçons (la plus récente d'abord, par ordre lexicographique de date). */

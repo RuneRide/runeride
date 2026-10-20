@@ -15,12 +15,14 @@ final class RoutesTest extends DbTestCase
     private Jwt $jwt;
     private F $http;
     private TokenVault $vault;
+    private string $vaultKey;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->jwt = new Jwt(Jwt::generateKeyPem(), 'iss', 'aud');
         $key = TokenVault::generateKey();
+        $this->vaultKey = $key;
         $this->vault = new TokenVault($key);
         $this->http = (new F())
             ->on('POST /user/login', F::json(['authToken' => 'tok']))
@@ -78,6 +80,33 @@ final class RoutesTest extends DbTestCase
         $this->assertSame(1, count($this->call('GET', '/api/trajets/carte', $u)[1]['trajets']));
         $this->assertSame(1, $this->call('DELETE', '/api/trajets', $u)[1]['supprimes']);
         $this->assertSame(0, $this->call('GET', '/api/trajets', $u)[1]['total']);
+    }
+
+    public function testSyncMatchesTracksOnlyWhenRaidoIsConfiguredAndForSubscribers(): void
+    {
+        $repo = new \RuneRide\Trips\GeorideAccountRepository($this->db);
+        $free = $this->makeUser('f@x.fr'); $abo = $this->makeUser('abo@x.fr', 'abonne');
+        foreach ([$free, $abo] as $u) {
+            $repo->save($u, 'g@x.fr', $this->vault->encrypt('tok'), null);
+            $this->call('GET', '/api/georide/motos', $u); // connaît les motos avant de les choisir
+            $repo->select($u, ['7']);
+        }
+        $this->assertArrayNotHasKey('troncons', $this->call('POST', '/api/georide/synchronisation', $free)[1], 'sans configuration : réponse inchangée');
+        $this->http->on('POST /v1/apparier', F::json(['troncons' => [[7, 0], [7, 1]], 'couverture' => 1.0, 'points' => 3, 'points_apparies' => 3, 'graphe' => ['version' => 'v1']]));
+        $router = new Router();
+        // même clé de chiffrement que le coffre du test, avec Raido en plus
+        $config = new Config(['RUNERIDE_GEORIDE_KEY' => $this->vaultKey, 'RUNERIDE_GEORIDE_URL' => 'https://stub.test', 'RUNERIDE_RAIDO_URL' => 'https://raido.test', 'RUNERIDE_RAIDO_CLE_SERVICE' => 'cle']);
+        (require __DIR__ . '/../../src/Trips/routes.php')($router, $config, $this->jwt, $this->http, $this->db);
+        $appel = function (int $u) use ($router): array {
+            $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $this->jwt->issue($u);
+            return $router->dispatch('POST', '/api/georide/synchronisation');
+        };
+        [$code, $body] = $appel($free);
+        $this->assertSame([200, 0], [$code, $body['troncons']['apparies']], 'compte gratuit : rien n\'est envoyé');
+        $this->assertSame(0, $this->http->count('POST /v1/apparier'));
+        [$code, $body] = $appel($abo);
+        $this->assertSame([200, 1], [$code, $body['troncons']['apparies']]);
+        $this->assertSame([[7, 0], [7, 1]], (new \RuneRide\Balade\TronconRepository($this->db))->listForUser($abo, 'v1', 10));
     }
 
     public function testLinkStoresEncryptedPasswordAndValidatesCredentials(): void
