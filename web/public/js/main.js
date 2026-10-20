@@ -3,6 +3,8 @@ import { vueConnexion } from './vues/connexion.js';
 import { vueTrajets } from './vues/trajets.js';
 import { vueRavitaillement } from './vues/pitstop.js';
 import { vueCompte } from './vues/compte.js';
+import { vueBalade } from './vues/balade.js';
+import { vuePartage } from './vues/partage.js';
 import { bandeau, squelette } from './dom.js';
 
 const racine = document.getElementById('vue');
@@ -18,8 +20,8 @@ function analyser() {
   return { segments: chemin.split('/').filter(Boolean), params: new URLSearchParams(requete) };
 }
 
-const TITRES = { connexion: 'connexion', trajets: 'mes trajets', trajet: 'trajet', compte: 'compte', ravitaillement: 'pit-stop' };
-const PLEIN_ECRAN = new Set(['trajets', 'trajet', 'ravitaillement', 'connexion']);
+const TITRES = { connexion: 'connexion', trajets: 'mes trajets', trajet: 'trajet', compte: 'compte', ravitaillement: 'pit-stop', balade: 'balade', partage: 'balade partagée' };
+const PLEIN_ECRAN = new Set(['trajets', 'trajet', 'ravitaillement', 'connexion', 'balade', 'partage']);
 
 async function rendre() {
   const { segments, params } = analyser();
@@ -40,9 +42,9 @@ async function rendre() {
   nettoyage = null;
   const moi = ++jetonRendu;
 
-  const publique = route === 'connexion';
+  const publique = route === 'connexion' || route === 'partage'; // partage : lecture d'une balade par son lien, sans compte
   if (!connecte && !publique) { aller(params.get('inscription') ? '/connexion?inscription=1' : '/connexion'); return; }
-  if (connecte && publique) { aller('/trajets'); return; }
+  if (connecte && route === 'connexion') { aller('/trajets'); return; }
 
   nav.querySelectorAll('a').forEach((a) => {
     const actif = a.dataset.route === route || (route === 'trajet' && a.dataset.route === 'trajets');
@@ -56,6 +58,8 @@ async function rendre() {
     case 'trajets': case 'trajet': vue = vueTrajets; break;
     case 'compte': vue = vueCompte; break;
     case 'ravitaillement': vue = vueRavitaillement; break;
+    case 'balade': vue = vueBalade; break;
+    case 'partage': vue = vuePartage; break;
     default: aller('/trajets'); return;
   }
   document.title = `RuneRide — ${TITRES[route]}`;

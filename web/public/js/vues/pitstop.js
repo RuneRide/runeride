@@ -35,6 +35,7 @@ export function vueRavitaillement(racine, { params }) {
   const boutonPosition = h('button', { class: 'puce', type: 'button' }, icone('position'), 'Ma position');
   const boutonTrajet = h('button', { class: 'puce', type: 'button' }, icone('route'), 'Dernier trajet');
   const boutonCarte = h('button', { class: 'puce', type: 'button', 'aria-pressed': 'false' }, icone('pointer'), 'Sur la carte');
+  const lienBalade = h('a', { class: 'puce', href: '#/balade', hidden: true }, icone('itineraire'), 'Balade depuis ici');
 
   // --- Carburant et réglages
   const segments = h('div', { class: 'segments', role: 'radiogroup', 'aria-label': 'Carburant' }, CARBURANTS.map(([v, n]) =>
@@ -59,7 +60,7 @@ export function vueRavitaillement(racine, { params }) {
 
   corps.append(
     h('div', { class: 'entete-panneau titre-bureau' }, h('h1', { style: 'font-size:22px' }, 'Pit-stop')),
-    etatPosition, h('div', { class: 'puces' }, boutonPosition, boutonTrajet, boutonCarte),
+    etatPosition, h('div', { class: 'puces' }, boutonPosition, boutonTrajet, boutonCarte, lienBalade),
     segments, reglages, msg, resultats);
 
   const lireCarburant = () => segments.querySelector('input:checked').value;
@@ -145,6 +146,7 @@ export function vueRavitaillement(racine, { params }) {
   function definirPosition(p, { libelle = null, centrer = true } = {}) {
     position = p;
     prefs.derniere = p; ecrirePrefs(prefs);
+    lienBalade.hidden = false; lienBalade.href = `#/balade?lat=${p[0]}&lon=${p[1]}`;
     etatPosition.querySelector('span').replaceChildren(libelle ? `${libelle} · ` : '', h('span', { class: 'mono' }, fmtCoord(p)));
     if (carte) {
       if (!reperePosition) reperePosition = marqueurPosition(carte, p, { onDeplace: (q) => definirPosition(q, { libelle: 'Repère déplacé', centrer: false }) });

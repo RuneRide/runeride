@@ -259,3 +259,17 @@ details.danger .contenu { padding: 0 14px 14px; display: grid; gap: 8px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Balade (calculateur Raido) */
+.segments.deux { grid-template-columns: repeat(2, 1fr); }
+.form-balade .curseur[hidden] { display: none; }
+.actions-balade { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.actions-balade .btn { flex: 1 1 45%; min-height: 48px; }
+.actions-balade .btn[hidden] { display: none; }
+.form-titre { display: grid; gap: 8px; margin: 0 0 12px; }
+.resultat-balade .detail h2 { font-size: 20px; }
+.mes-balades { margin-top: 18px; }
+.titre-section { font-size: 15px; margin: 0 0 8px; color: var(--muted); }
+.ligne-balade { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+.ligne-balade .btn.danger { min-height: 44px; padding: 0 12px; }
+.position-etat + .position-etat { margin-top: -6px; }

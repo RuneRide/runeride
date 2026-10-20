@@ -82,6 +82,7 @@ export async function vueTrajets(racine, { aller, id }) {
         chiffre(fmtKm(t.distance_km), 'Distance', 'accent'), chiffre(fmtDuree(t.duree_min), 'Durée'),
         chiffre(fmtVitesse(t.distance_km, t.duree_min), 'Vitesse moyenne'), chiffre(fmtHeure(t.fin), 'Arrivée')),
       fin ? h('a', { class: 'btn plein', href: `#/ravitaillement?lat=${fin[0]}&lon=${fin[1]}` }, icone('carburant'), 'Pit-stop près de l\'arrivée') : null,
+      fin ? h('a', { class: 'btn plein', href: `#/balade?lat=${fin[0]}&lon=${fin[1]}` }, icone('itineraire'), 'Balade depuis l\'arrivée') : null,
       h('div', { class: 'nav-trajets' },
         h('button', { class: 'btn', type: 'button', disabled: !precedent, onclick: () => choisir(precedent.id) }, icone('gauche'), 'Plus ancien'),
         h('button', { class: 'btn', type: 'button', disabled: !suivant, onclick: () => choisir(suivant.id) }, 'Plus récent', icone('droite')))));
