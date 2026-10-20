@@ -18,6 +18,7 @@ final class TripsApi
         private readonly TokenVault $vault,
         private readonly FuelSearch $fuel,
         private readonly ?LoginThrottle $throttle = null,
+        private readonly ?\RuneRide\Balade\TronconMatcher $matcher = null,
     ) {}
 
     /** @param array<string,mixed> $q @return array{0:int,1:array<string,mixed>} */
@@ -134,7 +135,16 @@ final class TripsApi
             return [409, ['erreur' => 'aucune moto sélectionnée']];
         }
         try {
-            return [200, $this->sync->sync($uid)];
+            $result = $this->sync->sync($uid);
+            if ($this->matcher !== null) {
+                // Appariement des tracés au réseau (découverte, abonnés) : au mieux, jamais bloquant pour la synchronisation.
+                try {
+                    $result['troncons'] = $this->matcher->matchPending($uid);
+                } catch (\Throwable $e) {
+                    error_log('[runeride/troncons] ' . $e::class . ': ' . $e->getMessage());
+                }
+            }
+            return [200, $result];
         } catch (GeorideException $e) {
             return $this->georideError($e);
         }

@@ -22,6 +22,12 @@ return static function (Router $router, Config $config, Jwt $jwt, ?HttpClient $h
         $tripRepo = new TripRepository($db);
         $client = new GeorideClient($http, $config->get('RUNERIDE_GEORIDE_URL', 'https://api.georide.com'));
         $subs = new SubscriptionRepository($db);
+        $raidoUrl = $config->get('RUNERIDE_RAIDO_URL', '');
+        $raidoKey = $config->get('RUNERIDE_RAIDO_CLE_SERVICE', '');
+        // Appariement des tracés : actif seulement si l'adresse de Raido et la clé de service sont renseignées.
+        $matcher = $raidoUrl !== '' && $raidoKey !== ''
+            ? new \RuneRide\Balade\TronconMatcher($http, new \RuneRide\Balade\TronconRepository($db), $tripRepo, $subs, $raidoUrl, $raidoKey)
+            : null;
         return new TripsApi(
             new TripService($tripRepo, $subs, max(1, (int) $config->get('RUNERIDE_FREE_HISTORY_DAYS', '30'))),
             $tripRepo,
@@ -31,6 +37,7 @@ return static function (Router $router, Config $config, Jwt $jwt, ?HttpClient $h
             $vault,
             new FuelSearch(new FranceProvider($http, new StationRepository($db))),
             new LoginThrottle($db),
+            $matcher,
         );
     };
 
