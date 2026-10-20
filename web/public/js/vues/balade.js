@@ -69,6 +69,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
   let depart = null; let arrivee = null;
   let repereDepart = null; let repereArrivee = null; let trace = null;
   let quota = null;                 // réponse de GET /api/balade/quota (palier, limite_km, grands_restants…)
+  let reglages = null;              // préférences du Compte (GET /api/balade/preferences) : vitesses et pause, transmises à Raido à chaque calcul
   let jeton = null;                 // { valeur, type, expire } : réutilisé 15 min (autre proposition, sens inverse)
   let resultat = null;              // dernière réponse de Raido + la requête envoyée
   let enregistree = null;           // { id, titre, partagee, cle } quand le résultat vient d'être enregistré ou rechargé
@@ -238,6 +239,9 @@ export function vueBalade(racine, { params, id: idBalade }) {
       evitements: prefs.evitements,
       variante,
     };
+    // Réglages du Compte (spec §7.3) : Raido est sans état, il les reçoit dans chaque requête. Absents = défauts du moteur.
+    if (reglages?.vitesses) corps.vitesses = reglages.vitesses;
+    if (Number.isFinite(reglages?.pause_min_par_h) && reglages.pause_min_par_h !== 10) corps.pause_min_par_h = reglages.pause_min_par_h;
     if (!prefs.retour) corps.arrivee = { lat: arrivee[0], lon: arrivee[1] };
     else if (prefs.mode === 'duree') corps.duree_min = prefs.duree;
     if (prefs.mode === 'distance' || !prefs.retour) corps.distance_km = prefs.retour ? prefs.distance : undefined;
@@ -398,6 +402,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
   majReglages();
   (async () => {
     try { quota = await get('/api/balade/quota'); } catch (e) { if (e.status !== 401) msg.replaceChildren(erreurVue(e) || ''); }
+    try { reglages = await get('/api/balade/preferences'); } catch { /* sans les réglages du Compte : défauts du moteur */ }
     majReglages();
     chargerBalades();
     const lat = Number(params.get('lat')); const lon = Number(params.get('lon'));
