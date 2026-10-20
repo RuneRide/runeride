@@ -31,6 +31,7 @@ final class BaladeApi
         private readonly ?BaladeRepository $balades = null,
         private readonly int $savedFree = 5,
         private readonly ?PreferencesRepository $prefs = null,
+        private readonly ?TronconRepository $troncons = null,
     ) {}
 
     /**
@@ -299,6 +300,38 @@ final class BaladeApi
     private function prefsRepo(): PreferencesRepository
     {
         return $this->prefs ?? throw new \LogicException('PreferencesRepository absent');
+    }
+
+    // ---------- Tronçons déjà parcourus, pour la découverte (spec §4.4, §7.1) ----------
+    public const MAX_TRONCONS = 50_000;
+
+    /**
+     * GET /api/balade/troncons?graphe= : tronçons distincts du compte [[way, segment], …], que la PWA transmet à Raido
+     * dans `troncons_connus`. Réservé aux abonnés (la découverte l'est). Sans `graphe`, la version la plus récente.
+     * Au-delà de MAX_TRONCONS, `complet` vaut false (la référence S3 de la spec §7.1 n'existe pas encore).
+     * @param array<string,mixed> $q
+     */
+    public function knownSegments(int $uid, array $q): array
+    {
+        if ($this->subscriptions->tierOf($uid) !== SubscriptionRepository::SUBSCRIBER) {
+            return [403, ['erreur' => 'La découverte est réservée aux abonnés.', 'code' => 'abonnement_requis']];
+        }
+        $repo = $this->tronconRepo();
+        $version = $q['graphe'] ?? null;
+        if ($version !== null && (!is_string($version) || $version === '' || strlen($version) > 64)) {
+            return [422, ['erreur' => 'graphe attendu : version de 64 caractères au plus', 'code' => 'version_invalide']];
+        }
+        $version ??= $repo->versionsForUser($uid)[0] ?? null;
+        if ($version === null) {
+            return [200, ['graphe' => null, 'total' => 0, 'complet' => true, 'troncons' => []]];
+        }
+        $total = $repo->countForUser($uid, $version);
+        return [200, ['graphe' => $version, 'total' => $total, 'complet' => $total <= self::MAX_TRONCONS, 'troncons' => $repo->listForUser($uid, $version, self::MAX_TRONCONS)]];
+    }
+
+    private function tronconRepo(): TronconRepository
+    {
+        return $this->troncons ?? throw new \LogicException('TronconRepository absent');
     }
 
     private function savedLimit(string $tier): ?int

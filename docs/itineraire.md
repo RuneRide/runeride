@@ -242,7 +242,7 @@ Nouvelles migrations, une instruction par fichier, dans `web/migrations/mariadb/
 | Migration | Table | Colonnes |
 |---|---|---|
 | `011_balades.sql` | `balades` | id, user_id, title, params_json (requête §7.2), trace_json (polyligne encodée), distance_m, duration_s, scores_json, graph_version, share_key (nullable, unique), created_at, updated_at |
-| `012_trajets_troncons.sql` | `trajets_troncons` | trip_id, troncon_id (BIGINT, identifiant stable §5.3), graph_version ; index (trip_id), (troncon_id) |
+| `012_trajets_troncons.sql` | `trajets_troncons` | trip_id, way_id (BIGINT), segment (SMALLINT), graph_version ; clé (trip_id, way_id, segment), index (way_id, segment), cascade sur `trips`. Le couple (way, segment) est l'identifiant stable du §5.3 tel que le moteur le lit dans `troncons_connus` (le géohash de secours reste dans la tuile) ; les identifiants ne sont comparables que pour une même `graph_version` |
 | `013_partage_motard.sql` | `users` | `partage_traces` TINYINT(1) DEFAULT 0 (opt-in §9) |
 | `014_balade_quota.sql` | `balade_quotas` | user_id, mois (CHAR(7)), grands_calculs INT ; clé (user_id, mois) |
 | `015_balade_preferences.sql` | `balade_preferences` | user_id (clé), vitesses_json (par classe de route, NULL = défaut), pause_min_par_h (défaut 10), seuils_meteo_json (défaut §4.5), calibration_json (vitesses mesurées par `raido-apparier`, nombre de trajets, date), updated_at |
