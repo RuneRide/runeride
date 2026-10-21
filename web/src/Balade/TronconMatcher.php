@@ -44,7 +44,9 @@ final class TronconMatcher
                 continue;
             }
             try {
-                $r = $this->http->request('POST', rtrim($this->baseUrl, '/') . '/v1/apparier', ['Content-Type' => 'application/json', 'x-cle-service' => $this->serviceKey], json_encode(['trace' => $path], JSON_THROW_ON_ERROR));
+                $body = json_encode(['trace' => $path], JSON_THROW_ON_ERROR);
+                // Derrière CloudFront (OAC de type lambda), un POST exige le condensé SHA-256 du corps (README du module Terraform raido).
+                $r = $this->http->request('POST', rtrim($this->baseUrl, '/') . '/v1/apparier', ['Content-Type' => 'application/json', 'x-cle-service' => $this->serviceKey, 'x-amz-content-sha256' => hash('sha256', $body)], $body);
             } catch (HttpException) {
                 $out['arret'] = 'injoignable';
                 $out['en_attente'] = count($pending) - $i;
