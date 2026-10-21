@@ -340,13 +340,15 @@ export function vueBalade(racine, { params, id: idBalade }) {
     const partager = h('button', { class: 'btn', type: 'button' }, icone('lien'), enregistree?.partagee ? 'Copier le lien' : 'Partager');
     const zonePartage = h('div', { 'aria-live': 'polite' });
     enregistrer.addEventListener('click', () => {
-      const titre = h('input', { type: 'text', id: 'b-titre', maxlength: 255, placeholder: `Balade de ${fmtKm(r.distance_m / 1000)}`, autocomplete: 'off' });
+      // Titre suggéré : le col ou le panorama de la boucle, sinon sa distance ; utilisé tel quel si le champ reste vide.
+      const suggestion = r.passe_par ? `Balade par ${r.passe_par}`.slice(0, 255) : `Balade de ${fmtKm(r.distance_m / 1000)}`;
+      const titre = h('input', { type: 'text', id: 'b-titre', maxlength: 255, placeholder: suggestion, autocomplete: 'off' });
       const ok = h('button', { class: 'btn primaire', type: 'submit' }, 'Enregistrer');
       const f = h('form', { class: 'form-titre' }, h('label', { class: 'champ' }, h('span', {}, 'Titre'), titre), ok);
       f.addEventListener('submit', async (ev) => {
         ev.preventDefault(); ok.disabled = true;
         try {
-          const s = await post('/api/balades', { titre: titre.value, params: r.requete, trace: r.trace, distance_m: r.distance_m, duree_s: r.duree_s, scores: r.scores ?? null, graphe_version: r.graphe?.version ?? null });
+          const s = await post('/api/balades', { titre: titre.value.trim() || (r.passe_par ? suggestion : ''), params: r.requete, trace: r.trace, distance_m: r.distance_m, duree_s: r.duree_s, scores: r.scores ?? null, graphe_version: r.graphe?.version ?? null });
           enregistree = { id: s.id, titre: s.titre, partagee: false };
           toast('ok', `« ${s.titre} » enregistrée.`);
           afficherResultat(); chargerBalades();
@@ -372,7 +374,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
       } catch (e) { if (e.status !== 401) toast('erreur', e.message); } finally { partager.disabled = false; }
     });
     zoneResultat.replaceChildren(
-      h('div', { class: 'detail' }, h('h2', {}, enregistree?.titre || (r.requete.retour ? 'Votre boucle' : 'Votre trajet')), ecart() ? h('p', { class: 'quand' }, ecart()) : null),
+      h('div', { class: 'detail' }, h('h2', {}, enregistree?.titre || (r.requete.retour ? 'Votre boucle' : 'Votre trajet')), r.passe_par ? h('p', { class: 'passe-par' }, icone('epingle', 16), `Passe par ${r.passe_par}`) : null, ecart() ? h('p', { class: 'quand' }, ecart()) : null),
       chiffres, scores,
       ...(r.avertissements || []).map((a) => bandeau('info', a)), // déployée : replaceChildren n'aplatit pas les tableaux
       h('div', { class: 'actions-balade' }, autre, inverser, enregistrer, partager, gpxBtn, ouvrir),

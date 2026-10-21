@@ -273,3 +273,6 @@ details.danger .contenu { padding: 0 14px 14px; display: grid; gap: 8px; }
 .ligne-balade { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
 .ligne-balade .btn.danger { min-height: 44px; padding: 0 12px; }
 .position-etat + .position-etat { margin-top: -6px; }
+
+.resultat-balade .passe-par { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-weight: 600; color: var(--accent); }
+.resultat-balade .passe-par .icone { width: 16px; height: 16px; flex: none; }
