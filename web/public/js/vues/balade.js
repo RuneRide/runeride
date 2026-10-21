@@ -69,6 +69,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
   let depart = null; let arrivee = null;
   let repereDepart = null; let repereArrivee = null; let trace = null;
   let quota = null;                 // réponse de GET /api/balade/quota (palier, limite_km, grands_restants…)
+  let connus = null;                // tronçons déjà parcourus (GET /api/balade/troncons), lus une fois par vue et seulement pour la découverte
   let reglages = null;              // préférences du Compte (GET /api/balade/preferences) : vitesses et pause, transmises à Raido à chaque calcul
   let jeton = null;                 // { valeur, type, expire } : réutilisé 15 min (autre proposition, sens inverse)
   let resultat = null;              // dernière réponse de Raido + la requête envoyée
@@ -231,6 +232,13 @@ export function vueBalade(racine, { params, id: idBalade }) {
     majQuota();
     return jeton;
   }
+  /** Tronçons parcourus pour la découverte (abonnés) : lus une fois, transmis à Raido dans `troncons_connus`. */
+  async function chargerConnus() {
+    if (connus) return connus;
+    const r = await get('/api/balade/troncons');
+    connus = { graphe: r.graphe, total: r.total, complet: r.complet, liste: r.troncons };
+    return connus;
+  }
   function requete(variante) {
     const corps = {
       depart: { lat: depart[0], lon: depart[1] },
@@ -240,6 +248,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
       variante,
     };
     // Réglages du Compte (spec §7.3) : Raido est sans état, il les reçoit dans chaque requête. Absents = défauts du moteur.
+    if (prefs.decouverte && connus?.liste.length) corps.troncons_connus = connus.liste;
     if (reglages?.vitesses) corps.vitesses = reglages.vitesses;
     if (Number.isFinite(reglages?.pause_min_par_h) && reglages.pause_min_par_h !== 10) corps.pause_min_par_h = reglages.pause_min_par_h;
     if (!prefs.retour) corps.arrivee = { lat: arrivee[0], lon: arrivee[1] };
@@ -263,10 +272,22 @@ export function vueBalade(racine, { params, id: idBalade }) {
     try {
       const j = await obtenirJeton(type);
       if (!j.raidoUrl) throw new ApiError(503, 'Le calculateur n\'est pas encore en service : le jeton est délivré, mais aucune adresse Raido n\'est configurée.');
+      if (prefs.decouverte) {
+        try { await chargerConnus(); } catch (e) { if (e.abonnementRequis) throw e; /* sans la liste : calcul sans pénalité, signalé plus bas */ }
+      }
       const corps = requete(variante);
       const r = await appelerRaido(j.raidoUrl, prefs.retour ? '/v1/balade' : '/v1/trajet', corps, j.valeur);
       if (moi !== compteur) return;
-      resultat = { ...r, requete: corps, points: decoderPolyligne(r.trace), type };
+      const avis = [];
+      if (prefs.decouverte) {
+        if (!connus) avis.push('Vos routes déjà parcourues n\'ont pas pu être lues : la découverte n\'a pas été appliquée.');
+        else if (connus.total === 0) avis.push('Aucun de vos trajets n\'est encore rattaché au réseau : synchronisez GeoRide, puis relancez. La découverte n\'a pas pu éviter vos routes.');
+        else {
+          if (!connus.complet) avis.push(`Votre historique compte ${connus.total.toLocaleString('fr-FR')} tronçons : seuls les ${connus.liste.length.toLocaleString('fr-FR')} premiers sont pris en compte.`);
+          if (r.graphe?.version && connus.graphe && r.graphe.version !== connus.graphe) avis.push('Vos trajets ont été rattachés à une autre version de la carte : la découverte peut être approximative jusqu\'à la prochaine synchronisation.');
+        }
+      }
+      resultat = { ...r, avertissements: [...(r.avertissements || []), ...avis], requete: corps, points: decoderPolyligne(r.trace), type };
       afficherResultat();
     } catch (e) {
       if (moi !== compteur) return;
@@ -353,7 +374,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
     zoneResultat.replaceChildren(
       h('div', { class: 'detail' }, h('h2', {}, enregistree?.titre || (r.requete.retour ? 'Votre boucle' : 'Votre trajet')), ecart() ? h('p', { class: 'quand' }, ecart()) : null),
       chiffres, scores,
-      (r.avertissements || []).map((a) => bandeau('info', a)),
+      ...(r.avertissements || []).map((a) => bandeau('info', a)), // déployée : replaceChildren n'aplatit pas les tableaux
       h('div', { class: 'actions-balade' }, autre, inverser, enregistrer, partager, gpxBtn, ouvrir),
       zonePartage,
       h('p', { class: 'muted petit' }, r.attribution || ''));
