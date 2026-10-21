@@ -52,6 +52,7 @@ final class TronconMatcherTest extends DbTestCase
         $this->assertSame('https://raido.test/v1/apparier', $call['url'], 'barre finale de l\'adresse ignorée');
         $this->assertSame('cle-de-service', $call['headers']['x-cle-service']);
         $this->assertCount(5, json_decode($call['body'], true)['trace']);
+        $this->assertSame(hash('sha256', $call['body']), $call['headers']['x-amz-content-sha256'], 'condensé du corps exigé par la Function URL derrière CloudFront');
         $this->assertSame([[10, 0], [10, 1]], $this->repo->listForUser($u, '2026-10-18', 10));
         $this->assertSame(2, $this->repo->countForTrip($t1));
         $this->assertSame([], $this->repo->pendingTrips($u, 10), 'plus rien en attente');
