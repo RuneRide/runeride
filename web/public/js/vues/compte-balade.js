@@ -66,15 +66,15 @@ export function sectionBalade() {
     const partage = h('input', { type: 'checkbox', id: 'p-partage', checked: p.partage_traces });
     partage.addEventListener('change', async () => {
       const voulu = partage.checked; partage.disabled = true;
-      try { await put('/api/balade/partage-traces', { actif: voulu }); toast('ok', voulu ? 'Partage anonyme activé.' : 'Partage retiré. Vos traces ne seront plus prises en compte au prochain recalcul.'); }
+      try { await put('/api/balade/partage-traces', { actif: voulu }); toast('ok', voulu ? 'Accord enregistré. Le score « motard » n\'est pas encore calculé : aucun de vos trajets n\'est utilisé pour l\'instant.' : 'Accord retiré.'); }
       catch (e) { partage.checked = !voulu; if (e.status !== 401) toast('erreur', e.message); }
       partage.disabled = false;
     });
     return h('div', {}, form,
       h('div', { class: 'zone-partage' },
         h('h3', { style: 'font-size:15px;margin:16px 0 4px' }, 'Score « motard »'),
-        h('label', { class: 'case' }, partage, 'Contribuer, de façon anonyme, au score « motard » des routes'),
-        h('p', { class: 'muted petit' }, 'Vos trajets GeoRide sont comptés par tronçon, sans lien avec votre compte, après suppression des 500 premiers et derniers mètres. Vous pouvez retirer votre accord à tout moment.')));
+        h('label', { class: 'case' }, partage, 'Accepter de contribuer, de façon anonyme, au futur score « motard » des routes'),
+        h('p', { class: 'muted petit' }, 'Ce score n\'est pas encore calculé : pour l\'instant, cette option enregistre seulement votre accord et aucun de vos trajets n\'est utilisé. Le moment venu, ils seront comptés par tronçon, sans lien avec votre compte, après suppression des 500 premiers et derniers mètres. Vous pouvez retirer votre accord à tout moment. ', h('a', { href: 'https://runeride.fr/confidentialite/', target: '_blank', rel: 'noopener' }, 'Politique de confidentialité'), '.')));
   }
 
   rafraichir();
