@@ -19,6 +19,7 @@ const dateHeure = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeSt
 const dateSeule = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' });
 export const fmtDateHeure = (iso) => (iso ? dateHeure.format(new Date(iso)) : '—');
 export const fmtDate = (iso) => (iso ? dateSeule.format(new Date(iso)) : '—');
+export const fmtDenivele = (m) => `+${Math.round(Number(m)).toLocaleString('fr-FR')} m`;
 export const fmtKm = (km) => `${Number(km).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`;
 export function fmtDuree(min) {
   const m = Math.round(min);

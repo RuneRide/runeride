@@ -100,6 +100,14 @@ final class BaladesEnregistreesTest extends DbTestCase
         $this->assertSame(404, $this->call('GET', '/api/balade', $u, ['id' => $id])[0]);
     }
 
+    public function testElevationGainTravelsInTheScoresObject(): void
+    {
+        $u = $this->makeUser();
+        [, $out] = $this->call('POST', '/api/balades', $u, [], ['scores' => ['sinuosite' => 0.5, 'denivele_m' => 1233]] + self::balade('Annecy'));
+        $d = $this->call('GET', '/api/balade', $u, ['id' => $out['id']])[1];
+        $this->assertSame(1233, $d['scores']['denivele_m'], 'le dénivelé survit à l\'enregistrement, sans nouvelle colonne');
+    }
+
     public function testSaveValidatesTheBody(): void
     {
         $u = $this->makeUser();
