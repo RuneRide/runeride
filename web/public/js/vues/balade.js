@@ -1,5 +1,5 @@
 import { get, post, put, del, ApiError } from '../api.js';
-import { h, fmtKm, fmtDuree, fmtHeure, bandeau, squelette, toast } from '../dom.js';
+import { h, fmtKm, fmtDenivele, fmtDuree, fmtHeure, bandeau, squelette, toast } from '../dom.js';
 import { icone } from '../icones.js';
 import { creerCarte, marqueur, marqueurPosition, cadrer } from '../carte.js';
 import { afficher, erreurVue, invitationAbonnement, ecranCarte } from './commun.js';
@@ -323,7 +323,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
       chiffre(fmtKm(r.distance_m / 1000), 'distance'), chiffre(fmtDuree(r.duree_s / 60), 'durée, pauses comprises'), chiffre(arriveeA, 'arrivée si départ maintenant'));
     const scores = h('div', { class: 'chiffres' },
       chiffre(pct(r.scores?.sinuosite), 'sinuosité'),
-      r.denivele_m != null ? chiffre(`${r.denivele_m} m`, 'dénivelé') : chiffre(pct(r.scores?.scenique), 'scénique'),
+      r.denivele_m != null ? chiffre(fmtDenivele(r.denivele_m), 'dénivelé') : chiffre(pct(r.scores?.scenique), 'scénique'),
       r.requete.preferences.decouverte ? chiffre(pct(r.scores?.nouveaute), 'nouveauté') : chiffre(pct(r.scores?.motard), 'motard'));
     const autre = h('button', { class: 'btn', type: 'button', disabled: !(r.variantes > 1) }, icone('actualiser'), 'Autre proposition');
     autre.addEventListener('click', () => lancer({ variante: ((r.variante ?? 0) + 1) % Math.max(1, r.variantes || 1) }));
@@ -348,7 +348,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
       f.addEventListener('submit', async (ev) => {
         ev.preventDefault(); ok.disabled = true;
         try {
-          const s = await post('/api/balades', { titre: titre.value.trim() || (r.passe_par ? suggestion : ''), params: r.requete, trace: r.trace, distance_m: r.distance_m, duree_s: r.duree_s, scores: r.scores ?? null, graphe_version: r.graphe?.version ?? null });
+          const s = await post('/api/balades', { titre: titre.value.trim() || (r.passe_par ? suggestion : ''), params: r.requete, trace: r.trace, distance_m: r.distance_m, duree_s: r.duree_s, scores: r.scores ? { ...r.scores, ...(r.denivele_m != null ? { denivele_m: r.denivele_m } : {}) } : null, graphe_version: r.graphe?.version ?? null });
           enregistree = { id: s.id, titre: s.titre, partagee: false };
           toast('ok', `« ${s.titre} » enregistrée.`);
           afficherResultat(); chargerBalades();
@@ -415,7 +415,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
       const q = b.params || {};
       if (q.depart) definirPoint('depart', [q.depart.lat, q.depart.lon], { libelle: 'Départ de la balade', centrer: false });
       if (q.arrivee) definirPoint('arrivee', [q.arrivee.lat, q.arrivee.lon], { libelle: 'Arrivée', centrer: false });
-      resultat = { trace: b.trace, points: decoderPolyligne(b.trace), distance_m: b.distance_m, duree_s: b.duree_s, scores: b.scores, graphe: { version: b.graphe_version }, variantes: 1, variante: 0, avertissements: [], attribution: b.attribution, requete: { retour: !q.arrivee, preferences: q.preferences || {}, ...q } };
+      resultat = { trace: b.trace, points: decoderPolyligne(b.trace), distance_m: b.distance_m, duree_s: b.duree_s, scores: b.scores, denivele_m: b.scores?.denivele_m ?? null, graphe: { version: b.graphe_version }, variantes: 1, variante: 0, avertissements: [], attribution: b.attribution, requete: { retour: !q.arrivee, preferences: q.preferences || {}, ...q } };
       enregistree = { id: b.id, titre: b.titre, partagee: b.partagee };
       afficherResultat();
     } catch (e) { if (moi !== compteur) return; zoneResultat.replaceChildren(); if (e.status !== 401) msg.replaceChildren(erreurVue(e) || ''); }

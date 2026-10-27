@@ -1,5 +1,5 @@
 import { api, lireJeton } from '../api.js';
-import { h, fmtKm, fmtDuree, fmtDate, bandeau, squelette } from '../dom.js';
+import { h, fmtKm, fmtDenivele, fmtDuree, fmtDate, bandeau, squelette } from '../dom.js';
 import { icone } from '../icones.js';
 import { creerCarte, marqueur, cadrer } from '../carte.js';
 import { afficher, ecranCarte } from './commun.js';
@@ -38,7 +38,7 @@ export async function vuePartage(racine, { params }) {
   });
   corps.replaceChildren(
     h('div', { class: 'detail' }, h('h2', {}, b.titre), h('p', { class: 'quand' }, `Balade partagée, calculée le ${fmtDate(b.creee_le)}.`)),
-    h('div', { class: 'chiffres' }, chiffre(fmtKm(b.distance_m / 1000), 'distance'), chiffre(fmtDuree(b.duree_s / 60), 'durée'), chiffre(`${Math.round((b.scores?.sinuosite || 0) * 100)} %`, 'sinuosité')),
+    h('div', { class: 'chiffres' }, chiffre(fmtKm(b.distance_m / 1000), 'distance'), chiffre(fmtDuree(b.duree_s / 60), 'durée'), chiffre(`${Math.round((b.scores?.sinuosite || 0) * 100)} %`, 'sinuosité'), b.scores?.denivele_m != null ? chiffre(fmtDenivele(b.scores.denivele_m), 'dénivelé') : null),
     h('div', { class: 'actions-balade' }, gpxBtn, h('a', { class: 'btn primaire', href: lireJeton() ? '#/balade' : '#/connexion?inscription=1' }, icone('itineraire'), 'Créer ma balade')),
     bandeau('info', 'La balade est une suggestion : la signalisation et le code de la route priment.'),
     h('p', { class: 'muted petit' }, b.attribution || ''));
