@@ -166,6 +166,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
 .puce:hover:not(:disabled) { border-color: var(--muted); }
 .puce[aria-pressed="true"] { border-color: var(--accent-fond); background: color-mix(in srgb, var(--accent-fond) 18%, transparent); }
 .puce:disabled { opacity: .55; cursor: progress; }
+.etapes { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.ligne-etape { display: flex; align-items: center; gap: 6px; }
+.ligne-etape > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ligne-etape .btn { min-width: 44px; min-height: 44px; padding: 0 10px; }
 .puce .icone { width: 18px; height: 18px; color: var(--accent); }
 @media (max-width: 759px) { .titre-bureau { display: none; } }
 .segments { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; margin: 0 0 12px; background: var(--bg); }
