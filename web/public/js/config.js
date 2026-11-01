@@ -34,4 +34,9 @@ export const ZOOM_DEFAUT = 5;
 // Où envoyer quelqu'un qui doit s'abonner (tarifs du site vitrine, sur un autre domaine).
 export const URL_ABONNEMENT = 'https://runeride.fr/tarifs/';
 
+// Contrainte météo des balades (spec §4.5). Le moteur sait la traiter (runeride-carto, J5) mais aucune source météo réelle
+// n'est branchée tant que `POST /v1/route` de RuneRide Météo n'existe pas : à passer à true quand elle répondra, pas avant
+// (sinon la case ne ferait rien d'autre qu'afficher « météo indisponible »).
+export const METEO_BRANCHEE = false;
+
 export const CLE_JETON = 'runeride.jeton';
