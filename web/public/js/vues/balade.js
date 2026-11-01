@@ -4,6 +4,7 @@ import { icone } from '../icones.js';
 import { creerCarte, marqueur, marqueurPosition, cadrer } from '../carte.js';
 import { afficher, erreurVue, invitationAbonnement, ecranCarte } from './commun.js';
 import { decoderPolyligne, gpx, echantillonner } from '../polyligne.js';
+import { METEO_BRANCHEE } from '../config.js';
 
 // ---------- Balade (calculateur Raido) : spec docs/itineraire.md §6 ----------
 // La PWA demande un jeton court au PHP (POST /api/balade/jeton, décompte des paliers), puis appelle Raido
@@ -12,7 +13,7 @@ import { decoderPolyligne, gpx, echantillonner } from '../polyligne.js';
 // météo arrivent avec les jalons suivants.
 
 const CLE_PREFS = 'runeride.balade';
-const PAR_DEFAUT = { retour: true, mode: 'duree', duree: 180, distance: 100, sinuosite: 3, scenique: 2, motard: 2, decouverte: false, intensite: 2, evitements: ['autoroutes', 'peages'], derniere: null };
+const PAR_DEFAUT = { retour: true, mode: 'duree', duree: 180, distance: 100, sinuosite: 3, scenique: 2, motard: 2, decouverte: false, intensite: 2, meteo: false, departA: '', evitements: ['autoroutes', 'peages'], derniere: null };
 const EVITEMENTS = [['autoroutes', 'Autoroutes'], ['peages', 'Péages'], ['non_revetu', 'Non revêtu'], ['tunnels', 'Tunnels']];
 const CRANS = ['aucun', 'léger', 'moyen', 'fort', 'maximal'];
 const VITESSE_CIBLE_KMH = 55; // même hypothèse que le moteur pour convertir une durée en distance (spec O3)
@@ -121,10 +122,17 @@ export function vueBalade(racine, { params, id: idBalade }) {
   // --- Contraintes
   const cases = Object.fromEntries(EVITEMENTS.map(([v]) => [v, h('input', { type: 'checkbox', name: 'evitement', value: v, checked: prefs.evitements.includes(v) })]));
   const resumeContraintes = h('span', { class: 'resume' });
+  // Météo (inactive tant que METEO_BRANCHEE est faux) : éviter pluie, vent fort et froid ressenti, aux seuils du Compte, à l'heure de passage.
+  const meteo = h('input', { type: 'checkbox', id: 'b-meteo', checked: prefs.meteo });
+  const departA = h('input', { type: 'datetime-local', id: 'b-depart-a', value: prefs.departA });
+  const blocMeteo = METEO_BRANCHEE ? h('div', { class: 'groupe-meteo' },
+    h('label', { class: 'case' }, meteo, h('span', {}, 'Éviter la pluie, le vent fort et le froid', h('small', { class: 'muted petit' }, ' (seuils réglables dans le Compte)'))),
+    h('label', { for: 'b-depart-a' }, 'Heure de départ prévue'), departA) : null;
   const contraintes = h('details', { class: 'reglages' },
     h('summary', {}, icone('reglages', 18), 'Éviter', resumeContraintes),
     h('div', { class: 'contenu' }, EVITEMENTS.map(([v, n]) => h('label', { class: 'case' }, cases[v], n)),
-      h('p', { class: 'muted petit' }, 'Étapes, autonomie et météo arrivent dans une prochaine version.')));
+      blocMeteo,
+      h('p', { class: 'muted petit' }, METEO_BRANCHEE ? 'Étapes et autonomie arrivent dans une prochaine version.' : 'Étapes, autonomie et météo arrivent dans une prochaine version.')));
 
   const msg = h('div', { 'aria-live': 'polite' });
   const zoneResultat = h('div', { class: 'resultat-balade' });
@@ -147,6 +155,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
     prefs.sinuosite = Number(sinuosite.value); prefs.scenique = Number(scenique.value); prefs.motard = Number(motard.value);
     prefs.decouverte = decouverte.checked && estAbonne(); prefs.intensite = Number(intensite.value);
     prefs.evitements = EVITEMENTS.map(([v]) => v).filter((v) => cases[v].checked);
+    prefs.meteo = METEO_BRANCHEE && meteo.checked; prefs.departA = METEO_BRANCHEE ? departA.value : '';
     ecrirePrefs(prefs);
     sortieDuree.textContent = fmtDuree(prefs.duree); sortieDistance.textContent = fmtKm(prefs.distance);
     blocDuree.hidden = prefs.mode !== 'duree'; blocDistance.hidden = prefs.mode !== 'distance';
@@ -250,6 +259,10 @@ export function vueBalade(racine, { params, id: idBalade }) {
     // Réglages du Compte (spec §7.3) : Raido est sans état, il les reçoit dans chaque requête. Absents = défauts du moteur.
     if (prefs.decouverte && connus?.liste.length) corps.troncons_connus = connus.liste;
     if (reglages?.vitesses) corps.vitesses = reglages.vitesses;
+    if (METEO_BRANCHEE && prefs.meteo) {
+      corps.meteo = reglages?.seuils_meteo ?? {};
+      if (/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(prefs.departA)) corps.depart_a = prefs.departA;
+    }
     if (Number.isFinite(reglages?.pause_min_par_h) && reglages.pause_min_par_h !== 10) corps.pause_min_par_h = reglages.pause_min_par_h;
     if (!prefs.retour) corps.arrivee = { lat: arrivee[0], lon: arrivee[1] };
     else if (prefs.mode === 'duree') corps.duree_min = prefs.duree;
