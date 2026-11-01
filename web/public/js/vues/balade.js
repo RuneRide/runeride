@@ -13,6 +13,7 @@ import { METEO_BRANCHEE } from '../config.js';
 // météo arrivent avec les jalons suivants.
 
 const CLE_PREFS = 'runeride.balade';
+const ETAPES_MAX = 8; // limite du moteur (raido-calcul, requete::ETAPES_MAX)
 const PAR_DEFAUT = { retour: true, mode: 'duree', duree: 180, distance: 100, sinuosite: 3, scenique: 2, motard: 2, decouverte: false, intensite: 2, meteo: false, departA: '', evitements: ['autoroutes', 'peages'], derniere: null };
 const EVITEMENTS = [['autoroutes', 'Autoroutes'], ['peages', 'Péages'], ['non_revetu', 'Non revêtu'], ['tunnels', 'Tunnels']];
 const CRANS = ['aucun', 'léger', 'moyen', 'fort', 'maximal'];
@@ -68,6 +69,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
   if (carte) { carte.marge = marge; setTimeout(() => carte.invalidateSize(), 0); }
 
   let depart = null; let arrivee = null;
+  let etapes = []; let reperesEtapes = [];   // étapes obligatoires [lat, lon], dans l'ordre (8 au plus, comme le moteur)
   let repereDepart = null; let repereArrivee = null; let trace = null;
   let quota = null;                 // réponse de GET /api/balade/quota (palier, limite_km, grands_restants…)
   let connus = null;                // tronçons déjà parcourus (GET /api/balade/troncons), lus une fois par vue et seulement pour la découverte
@@ -83,6 +85,8 @@ export function vueBalade(racine, { params, id: idBalade }) {
   const boutonPosition = h('button', { class: 'puce', type: 'button' }, icone('position'), 'Ma position');
   const boutonCarte = h('button', { class: 'puce', type: 'button', 'aria-pressed': 'false' }, icone('pointer'), 'Départ sur la carte');
   const boutonArrivee = h('button', { class: 'puce', type: 'button', 'aria-pressed': 'false', hidden: true }, icone('pointer'), 'Arrivée sur la carte');
+  const boutonEtape = h('button', { class: 'puce', type: 'button', 'aria-pressed': 'false' }, icone('epingle'), 'Ajouter une étape');
+  const listeEtapes = h('ol', { class: 'liste etapes', hidden: true });
 
   // --- Essentiel
   const typeSegments = h('div', { class: 'segments deux', role: 'radiogroup', 'aria-label': 'Type de balade' },
@@ -138,7 +142,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
   const zoneResultat = h('div', { class: 'resultat-balade' });
   const zoneBalades = h('div', { class: 'mes-balades' });
   const form = h('form', { class: 'form-balade' },
-    etatDepart, etatArrivee, h('div', { class: 'puces' }, boutonPosition, boutonCarte, boutonArrivee),
+    etatDepart, etatArrivee, h('div', { class: 'puces' }, boutonPosition, boutonCarte, boutonArrivee, boutonEtape), listeEtapes,
     typeSegments, modeSegments, blocDuree, blocDistance, h('div', { class: 'puces' }, petiteBoucle),
     caractere, contraintes, calculer, infoQuota);
   corps.append(h('div', { class: 'entete-panneau titre-bureau' }, h('h1', { style: 'font-size:22px' }, 'Balade')), msg, zoneResultat, form, zoneBalades);
@@ -148,7 +152,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
   const estAbonne = () => quota?.palier === 'abonne';
   const limiteKm = () => Number(quota?.limite_km) || 25;
   /** Petite boucle (gratuite, illimitée) : retour au départ et distance demandée ≤ limite ; une durée implique une distance au-delà. */
-  const estPetiteBoucle = () => prefs.retour && (prefs.mode === 'distance' ? prefs.distance : (prefs.duree / 60) * VITESSE_CIBLE_KMH) <= limiteKm();
+  const estPetiteBoucle = () => prefs.retour && etapes.length === 0 && (prefs.mode === 'distance' ? prefs.distance : (prefs.duree / 60) * VITESSE_CIBLE_KMH) <= limiteKm();
   function majReglages() {
     prefs.retour = lireRadio(typeSegments) === 'boucle'; prefs.mode = lireRadio(modeSegments);
     prefs.duree = Number(duree.value); prefs.distance = Number(distance.value);
@@ -158,7 +162,8 @@ export function vueBalade(racine, { params, id: idBalade }) {
     prefs.meteo = METEO_BRANCHEE && meteo.checked; prefs.departA = METEO_BRANCHEE ? departA.value : '';
     ecrirePrefs(prefs);
     sortieDuree.textContent = fmtDuree(prefs.duree); sortieDistance.textContent = fmtKm(prefs.distance);
-    blocDuree.hidden = prefs.mode !== 'duree'; blocDistance.hidden = prefs.mode !== 'distance';
+    // avec des étapes, c'est le parcours qui fixe la longueur : plus de curseur de durée ni de distance
+    blocDuree.hidden = prefs.mode !== 'duree' || etapes.length > 0; blocDistance.hidden = prefs.mode !== 'distance' || etapes.length > 0;
     etatArrivee.hidden = boutonArrivee.hidden = prefs.retour;
     sortieSinu.textContent = CRANS[prefs.sinuosite]; sortieScen.textContent = CRANS[prefs.scenique]; sortieMot.textContent = CRANS[prefs.motard]; sortieInt.textContent = CRANS[prefs.intensite];
     decouverte.disabled = !estAbonne(); intensite.disabled = !prefs.decouverte;
@@ -209,19 +214,49 @@ export function vueBalade(racine, { params, id: idBalade }) {
     pointage = pointage === cible ? null : cible;
     boutonCarte.setAttribute('aria-pressed', String(pointage === 'depart'));
     boutonArrivee.setAttribute('aria-pressed', String(pointage === 'arrivee'));
+    boutonEtape.setAttribute('aria-pressed', String(pointage === 'etape'));
     consigne.hidden = !pointage;
-    consigne.textContent = pointage === 'depart' ? 'Touchez la carte pour placer le départ' : 'Touchez la carte pour placer l\'arrivée';
+    consigne.textContent = pointage === 'depart' ? 'Touchez la carte pour placer le départ' : pointage === 'etape' ? `Touchez la carte pour placer l\'étape ${etapes.length + 1}` : 'Touchez la carte pour placer l\'arrivée';
     zoneCarte.classList.toggle('pointage', Boolean(pointage));
     if (pointage) definirEtat('reduit');
   }
   boutonCarte.addEventListener('click', () => basculerPointage('depart'));
   boutonArrivee.addEventListener('click', () => basculerPointage('arrivee'));
+  boutonEtape.addEventListener('click', () => {
+    if (etapes.length >= ETAPES_MAX) { toast('info', `${ETAPES_MAX} étapes au plus.`); return; }
+    basculerPointage('etape');
+  });
   carte?.on('click', (e) => {
     if (!pointage) return;
     const cible = pointage; basculerPointage(cible);
-    definirPoint(cible, [e.latlng.lat, e.latlng.lng], { libelle: 'Point choisi', centrer: false });
+    if (cible === 'etape') ajouterEtape([e.latlng.lat, e.latlng.lng]);
+    else definirPoint(cible, [e.latlng.lat, e.latlng.lng], { libelle: 'Point choisi', centrer: false });
     definirEtat('moyen');
   });
+
+  // --- Étapes : placées sur la carte, réordonnables, retirables ; le moteur calcule le parcours qui les relie (aucune distance demandée)
+  function ajouterEtape(p) { etapes = [...etapes, p]; redessinerEtapes(); }
+  function retirerEtape(i) { etapes = etapes.filter((_, k) => k !== i); redessinerEtapes(); }
+  function deplacerEtape(i, delta) {
+    const j = i + delta;
+    if (j < 0 || j >= etapes.length) return;
+    const copie = [...etapes]; [copie[i], copie[j]] = [copie[j], copie[i]]; etapes = copie; redessinerEtapes();
+  }
+  function redessinerEtapes() {
+    for (const m of reperesEtapes) m.remove();
+    reperesEtapes = carte ? etapes.map((p, i) => marqueur(carte, p, `Étape ${i + 1}`, '#f59e0b')) : [];
+    const rendues = resultat?.etapes?.length === etapes.length ? resultat.etapes : null;
+    listeEtapes.hidden = etapes.length === 0;
+    listeEtapes.replaceChildren(...etapes.map((p, i) => {
+      const bouton = (texte, label, action, desactive = false) => { const b = h('button', { class: 'btn', type: 'button', 'aria-label': label, disabled: desactive }, texte); b.addEventListener('click', action); return b; };
+      return h('li', { class: 'ligne-etape' },
+        h('span', {}, h('strong', {}, `Étape ${i + 1}`), ' · ', h('span', { class: 'mono' }, fmtCoord(p)), rendues ? h('span', { class: 'muted' }, ` · à ${fmtKm(rendues[i].distance_m / 1000)} du départ`) : null),
+        bouton('▲', `Monter l'étape ${i + 1}`, () => deplacerEtape(i, -1), i === 0),
+        bouton('▼', `Descendre l'étape ${i + 1}`, () => deplacerEtape(i, 1), i === etapes.length - 1),
+        bouton(icone('fermer', 16), `Retirer l'étape ${i + 1}`, () => retirerEtape(i)));
+    }));
+    majReglages();
+  }
   function localiser() {
     if (!navigator.geolocation) { toast('erreur', 'La géolocalisation n\'est pas disponible sur cet appareil. Placez le départ sur la carte.'); return; }
     boutonPosition.disabled = true;
@@ -268,6 +303,10 @@ export function vueBalade(racine, { params, id: idBalade }) {
     else if (prefs.mode === 'duree') corps.duree_min = prefs.duree;
     if (prefs.mode === 'distance' || !prefs.retour) corps.distance_km = prefs.retour ? prefs.distance : undefined;
     if (corps.distance_km === undefined) delete corps.distance_km;
+    if (etapes.length) {
+      corps.etapes = etapes.map(([lat, lon]) => ({ lat, lon }));
+      delete corps.duree_min; delete corps.distance_km; // le parcours fixe la longueur
+    }
     return corps;
   }
   async function lancer({ variante = 0 } = {}) {
@@ -329,6 +368,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
     return null;
   }
   function afficherResultat() {
+    if (etapes.length) redessinerEtapes(); // distances au passage de chaque étape
     const r = resultat;
     dessinerTrace(r.points);
     const arriveeA = fmtHeure(new Date(Date.now() + r.duree_s * 1000).toISOString());
@@ -341,7 +381,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
     const autre = h('button', { class: 'btn', type: 'button', disabled: !(r.variantes > 1) }, icone('actualiser'), 'Autre proposition');
     autre.addEventListener('click', () => lancer({ variante: ((r.variante ?? 0) + 1) % Math.max(1, r.variantes || 1) }));
     const inverser = h('button', { class: 'btn', type: 'button', hidden: r.requete.retour }, icone('actualiser'), 'Inverser le sens');
-    inverser.addEventListener('click', () => { [depart, arrivee] = [arrivee, depart]; definirPoint('depart', depart, { libelle: 'Départ', centrer: false }); definirPoint('arrivee', arrivee, { libelle: 'Arrivée', centrer: false }); lancer(); });
+    inverser.addEventListener('click', () => { [depart, arrivee] = [arrivee, depart]; etapes = [...etapes].reverse(); redessinerEtapes(); definirPoint('depart', depart, { libelle: 'Départ', centrer: false }); definirPoint('arrivee', arrivee, { libelle: 'Arrivée', centrer: false }); lancer(); });
     const gpxBtn = h('button', { class: 'btn', type: 'button' }, icone('sortie'), 'GPX');
     gpxBtn.addEventListener('click', () => telecharger(`${(enregistree?.titre || 'balade-runeride').replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase()}.gpx`, gpx(r.points, { titre: enregistree?.titre || 'Balade RuneRide', attribution: r.attribution || '' }), 'application/gpx+xml'));
     const pts = echantillonner(r.points, 10);
@@ -428,6 +468,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
       const q = b.params || {};
       if (q.depart) definirPoint('depart', [q.depart.lat, q.depart.lon], { libelle: 'Départ de la balade', centrer: false });
       if (q.arrivee) definirPoint('arrivee', [q.arrivee.lat, q.arrivee.lon], { libelle: 'Arrivée', centrer: false });
+      etapes = Array.isArray(q.etapes) ? q.etapes.slice(0, ETAPES_MAX).filter((e) => Number.isFinite(e?.lat) && Number.isFinite(e?.lon)).map((e) => [e.lat, e.lon]) : [];
       resultat = { trace: b.trace, points: decoderPolyligne(b.trace), distance_m: b.distance_m, duree_s: b.duree_s, scores: b.scores, denivele_m: b.scores?.denivele_m ?? null, graphe: { version: b.graphe_version }, variantes: 1, variante: 0, avertissements: [], attribution: b.attribution, requete: { retour: !q.arrivee, preferences: q.preferences || {}, ...q } };
       enregistree = { id: b.id, titre: b.titre, partagee: b.partagee };
       afficherResultat();

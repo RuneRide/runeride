@@ -30,3 +30,10 @@ docker run --rm --network host -v /tmp/banc:/banc -w /home/pptruser ghcr.io/pupp
 
 18 vérifications (voir le scénario) ; sortie `TOUT OK` et code 0 si tout passe. Entre deux passages :
 `DELETE FROM balades; DELETE FROM balade_quotas;` (le quota est mensuel).
+
+## Étapes
+
+`scenario-etapes.mjs` (même installation, même commande en remplaçant le scénario copié dans `/tmp/banc/scenario.mjs`) : pose de deux étapes sur la carte,
+réordonnancement ▲ ▼, retrait, calcul par le vrai moteur (distance au passage de chaque étape affichée), enregistrement puis rechargement de la balade
+(les étapes reviennent dans le même ordre). Le graphe doit être au **format 4** (`rhone-alpes-j3`). Une exécution compte un grand calcul : vider
+`balades` et `balade_quotas` avant `scenario-balade.mjs`, qui attend 3 grands calculs restants.
