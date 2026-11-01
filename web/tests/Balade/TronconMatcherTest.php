@@ -35,9 +35,10 @@ final class TronconMatcherTest extends DbTestCase
         return (int) $this->pdo->query('SELECT id FROM trips WHERE georide_trip_id = ' . $this->pdo->quote($gid) . ' AND user_id = ' . $u)->fetchColumn();
     }
 
-    private function raido(array $troncons = [[10, 0], [10, 1]]): void
+    private function raido(array $troncons = [[10, 0], [10, 1]], string $version = '2026-10-18'): void
     {
-        $this->http->on('POST /v1/apparier', F::json(['troncons' => $troncons, 'couverture' => 0.97, 'points' => 120, 'points_apparies' => 116, 'graphe' => ['version' => '2026-10-18']]));
+        $this->http->on('GET /v1/sante', F::json(['etat' => 'ok', 'graphe' => ['version' => $version]]));
+        $this->http->on('POST /v1/apparier', F::json(['troncons' => $troncons, 'couverture' => 0.97, 'points' => 120, 'points_apparies' => 116, 'graphe' => ['version' => $version]]));
     }
 
     public function testSubscriberTripsAreMatchedOnceWithTheServiceKey(): void
@@ -58,6 +59,39 @@ final class TronconMatcherTest extends DbTestCase
         $this->assertSame([], $this->repo->pendingTrips($u, 10), 'plus rien en attente');
         $this->assertSame(['apparies' => 0, 'en_attente' => 0, 'arret' => null], $this->matcher()->matchPending($u));
         $this->assertSame(2, $this->http->count('POST /v1/apparier'), 'un trajet apparié n\'est pas renvoyé');
+    }
+
+    public function testTripsMatchedOnAnOlderGraphAreMatchedAgain(): void
+    {
+        $u = $this->makeUser('abo@x.fr', 'abonne');
+        $t1 = $this->trip($u, 'g1', '2026-10-01 08:00:00');
+        $t2 = $this->trip($u, 'g2', '2026-10-02 08:00:00');
+        $this->raido([[10, 0]], '2026-10-18');
+        $this->assertSame(2, $this->matcher()->matchPending($u)['apparies']);
+        $this->assertSame(0, $this->matcher()->matchPending($u)['apparies'], 'même graphe : rien à refaire');
+        $this->assertSame(2, $this->http->count('POST /v1/apparier'));
+        $this->raido([[20, 3], [20, 4]], '2026-11-02');
+        $this->assertSame(['apparies' => 2, 'en_attente' => 0, 'arret' => null], $this->matcher()->matchPending($u), 'nouveau graphe : les deux trajets repartent');
+        $this->assertSame([[20, 3], [20, 4]], $this->repo->listForUser($u, '2026-11-02', 10));
+        $this->assertSame([], $this->repo->listForUser($u, '2026-10-18', 10), 'les tronçons de l\'ancienne version sont remplacés');
+        $this->assertSame(2, $this->repo->countForTrip($t1));
+        $this->assertSame(0, $this->matcher()->matchPending($u)['apparies'], 'et une fois seulement');
+        $this->assertNotNull($t2);
+    }
+
+    public function testNoRematchWhenRaidoDoesNotAnswerTheHealthCheck(): void
+    {
+        $u = $this->makeUser('abo@x.fr', 'abonne');
+        $this->trip($u, 'g1', '2026-10-01 08:00:00');
+        $this->raido();
+        $this->matcher()->matchPending($u);
+        $this->http->on('GET /v1/sante', new HttpException('délai dépassé'));
+        $this->assertSame(['apparies' => 0, 'en_attente' => 0, 'arret' => null], $this->matcher()->matchPending($u));
+        $this->http->on('GET /v1/sante', F::json(['erreur' => 'x'], 503));
+        $this->assertSame(0, $this->matcher()->matchPending($u)['apparies']);
+        $this->http->on('GET /v1/sante', F::json(['etat' => 'ok']));
+        $this->assertSame(0, $this->matcher()->matchPending($u)['apparies'], 'version absente de la réponse : on ne devine pas');
+        $this->assertSame(1, $this->http->count('POST /v1/apparier'));
     }
 
     public function testFreeAccountsAreNeverSent(): void
