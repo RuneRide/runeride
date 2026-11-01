@@ -23,7 +23,19 @@ final class TronconMatcher
         private readonly int $budgetSeconds = 20,
     ) {}
 
-    /** @return array{apparies:int,en_attente:int,arret:?string} */
+    /** Version du graphe que sert Raido en ce moment (GET /v1/sante, public), ou null s'il ne répond pas : on ne rapparie alors rien. */
+    private function currentGraphVersion(): ?string
+    {
+        try {
+            $r = $this->http->request('GET', rtrim($this->baseUrl, '/') . '/v1/sante');
+        } catch (HttpException) {
+            return null;
+        }
+        $v = $r->ok() ? ($r->json()['graphe']['version'] ?? null) : null;
+        return is_string($v) && $v !== '' ? $v : null;
+    }
+
+    /** Apparie les trajets jamais traités, puis ceux appariés sur un ancien graphe. @return array{apparies:int,en_attente:int,arret:?string} */
     public function matchPending(int $uid, int $max = 25): array
     {
         $out = ['apparies' => 0, 'en_attente' => 0, 'arret' => null];
@@ -32,6 +44,13 @@ final class TronconMatcher
         }
         $start = microtime(true);
         $pending = $this->troncons->pendingTrips($uid, $max);
+        if (count($pending) < $max && $this->troncons->hasMatched($uid)) {
+            // Une nouvelle version du graphe invalide les tronçons déjà rangés : on rapparie les plus récents, après les trajets jamais traités.
+            $current = $this->currentGraphVersion();
+            if ($current !== null) {
+                $pending = [...$pending, ...$this->troncons->staleTrips($uid, $current, $max - count($pending))];
+            }
+        }
         foreach ($pending as $i => $tripId) {
             if (microtime(true) - $start > $this->budgetSeconds) {
                 $out['arret'] = 'delai';

@@ -70,6 +70,25 @@ final class TronconRepository
         ));
     }
 
+    /** Le compte a-t-il des trajets appariés (avec une version de graphe) ? Évite d'interroger Raido pour rien. */
+    public function hasMatched(int $userId): bool
+    {
+        return $this->db->fetchOne('SELECT 1 FROM trajets_apparies a JOIN trips t ON t.id = a.trip_id WHERE t.user_id = ? AND a.graph_version IS NOT NULL LIMIT 1', [$userId]) !== false;
+    }
+
+    /**
+     * Trajets appariés sur une autre version de graphe que $currentVersion (le plus récent d'abord), au plus $limit : à rapparier,
+     * car les identifiants de tronçons ne valent que pour la version qui les a produits. Les inapparentables (version nulle) ne reviennent pas.
+     * @return list<int>
+     */
+    public function staleTrips(int $userId, string $currentVersion, int $limit): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn(
+            'SELECT t.id FROM trips t JOIN trajets_apparies a ON a.trip_id = t.id WHERE t.user_id = ? AND a.graph_version IS NOT NULL AND a.graph_version <> ? AND t.points_count > 2 ORDER BY t.started_at DESC, t.id DESC LIMIT ' . max(1, $limit),
+            [$userId, $currentVersion],
+        ));
+    }
+
     /** Note qu'un trajet a été apparié (ou jugé inapparentable : couverture 0), pour ne pas le renvoyer à chaque synchronisation. */
     public function markMatched(int $tripId, ?string $graphVersion, float $coverage, int $points): void
     {
