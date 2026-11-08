@@ -35,10 +35,10 @@ final class TronconMatcherTest extends DbTestCase
         return (int) $this->pdo->query('SELECT id FROM trips WHERE georide_trip_id = ' . $this->pdo->quote($gid) . ' AND user_id = ' . $u)->fetchColumn();
     }
 
-    private function raido(array $troncons = [[10, 0], [10, 1]], string $version = '2026-10-18'): void
+    private function raido(array $troncons = [[10, 0], [10, 1]], string $version = '2026-10-18', ?array $publics = [[10, 0]]): void
     {
         $this->http->on('GET /v1/sante', F::json(['etat' => 'ok', 'graphe' => ['version' => $version]]));
-        $this->http->on('POST /v1/apparier', F::json(['troncons' => $troncons, 'couverture' => 0.97, 'points' => 120, 'points_apparies' => 116, 'graphe' => ['version' => $version]]));
+        $this->http->on('POST /v1/apparier', F::json(['troncons' => $troncons] + ($publics === null ? [] : ['troncons_publics' => $publics]) + ['couverture' => 0.97, 'points' => 120, 'points_apparies' => 116, 'graphe' => ['version' => $version]]));
     }
 
     public function testSubscriberTripsAreMatchedOnceWithTheServiceKey(): void
@@ -92,6 +92,22 @@ final class TronconMatcherTest extends DbTestCase
         $this->http->on('GET /v1/sante', F::json(['etat' => 'ok']));
         $this->assertSame(0, $this->matcher()->matchPending($u)['apparies'], 'version absente de la réponse : on ne devine pas');
         $this->assertSame(1, $this->http->count('POST /v1/apparier'));
+    }
+
+    public function testPublicSegmentsAreStoredAndOldEnginesAreRetried(): void
+    {
+        $u = $this->makeUser('abo@x.fr', 'abonne');
+        $t = $this->trip($u, 'g1', '2026-10-01 08:00:00');
+        $this->raido([[10, 0], [10, 1]], '2026-10-18', null);
+        $this->assertSame(1, $this->matcher()->matchPending($u)['apparies']);
+        $this->assertSame(0, (int) $this->pdo->query("SELECT COALESCE(SUM(publique), 0) FROM trajets_troncons WHERE trip_id = $t")->fetchColumn(), 'moteur sans troncons_publics : rien de public');
+        $this->assertSame(1, $this->matcher()->matchPending($u)['apparies'], 'sans la liste des publics, le trajet est rapparié à la synchronisation suivante');
+        $this->raido([[10, 0], [10, 1]], '2026-10-18', [[10, 1]]);
+        $this->assertSame(1, $this->matcher()->matchPending($u)['apparies']);
+        $this->assertSame([['10', '0', '0'], ['10', '1', '1']], array_map(fn ($r) => [(string) $r[0], (string) $r[1], (string) $r[2]], $this->pdo->query("SELECT way_id, segment, publique FROM trajets_troncons WHERE trip_id = $t ORDER BY segment")->fetchAll(\PDO::FETCH_NUM)));
+        $this->assertSame(0, $this->matcher()->matchPending($u)['apparies'], 'une fois la liste reçue, plus rien à refaire');
+        $this->raido([[10, 0]], '2026-10-18', []);
+        $this->assertSame([], $this->repo->staleTrips($u, '2026-10-18', 10));
     }
 
     public function testFreeAccountsAreNeverSent(): void
