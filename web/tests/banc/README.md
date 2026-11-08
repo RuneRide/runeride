@@ -37,3 +37,10 @@ docker run --rm --network host -v /tmp/banc:/banc -w /home/pptruser ghcr.io/pupp
 réordonnancement ▲ ▼, retrait, calcul par le vrai moteur (distance au passage de chaque étape affichée), enregistrement puis rechargement de la balade
 (les étapes reviennent dans le même ordre). Le graphe doit être au **format 4** (`rhone-alpes-j3`). Une exécution compte un grand calcul : vider
 `balades` et `balade_quotas` avant `scenario-balade.mjs`, qui attend 3 grands calculs restants.
+
+## Autonomie
+
+`scenario-autonomie.mjs` : compte **abonné** (`UPDATE users SET tier='abonne'` après l'inscription), stations simulées par interception de
+`/api/ravitaillement` (grille de 2 km autour d'Annecy), vrai moteur, graphe de format 4. Vérifie le champ, l'envoi de `autonomie` et de `stations`
+à Raido, les pleins affichés (distance, prix) et que l'enregistrement ne garde pas la liste des stations. Avec un compte abonné,
+`scenario-balade.mjs` (quota de gratuits) et la ligne « grand itinéraire » de `scenario-etapes.mjs` ne s'appliquent plus.

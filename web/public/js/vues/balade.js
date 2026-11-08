@@ -14,7 +14,7 @@ import { METEO_BRANCHEE } from '../config.js';
 
 const CLE_PREFS = 'runeride.balade';
 const ETAPES_MAX = 8; // limite du moteur (raido-calcul, requete::ETAPES_MAX)
-const PAR_DEFAUT = { retour: true, mode: 'duree', duree: 180, distance: 100, sinuosite: 3, scenique: 2, motard: 2, decouverte: false, intensite: 2, meteo: false, departA: '', evitements: ['autoroutes', 'peages'], derniere: null };
+const PAR_DEFAUT = { retour: true, mode: 'duree', duree: 180, distance: 100, sinuosite: 3, scenique: 2, motard: 2, decouverte: false, intensite: 2, meteo: false, departA: '', autonomieKm: 0, reservoir: 1, evitements: ['autoroutes', 'peages'], derniere: null };
 const EVITEMENTS = [['autoroutes', 'Autoroutes'], ['peages', 'Péages'], ['non_revetu', 'Non revêtu'], ['tunnels', 'Tunnels']];
 const CRANS = ['aucun', 'léger', 'moyen', 'fort', 'maximal'];
 const VITESSE_CIBLE_KMH = 55; // même hypothèse que le moteur pour convertir une durée en distance (spec O3)
@@ -77,6 +77,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
   let jeton = null;                 // { valeur, type, expire } : réutilisé 15 min (autre proposition, sens inverse)
   let resultat = null;              // dernière réponse de Raido + la requête envoyée
   let enregistree = null;           // { id, titre, partagee, cle } quand le résultat vient d'être enregistré ou rechargé
+  let avisAutonomie = null; let reperesStations = [];
   let compteur = 0; let pointage = null; // 'depart' | 'arrivee' | null
 
   // --- Points
@@ -126,6 +127,13 @@ export function vueBalade(racine, { params, id: idBalade }) {
   // --- Contraintes
   const cases = Object.fromEntries(EVITEMENTS.map(([v]) => [v, h('input', { type: 'checkbox', name: 'evitement', value: v, checked: prefs.evitements.includes(v) })]));
   const resumeContraintes = h('span', { class: 'resume' });
+  // Autonomie (abonnés) : au-delà de ce que permet le réservoir, Raido insère des stations choisies parmi celles proches de la balade.
+  const autonomie = h('input', { type: 'number', id: 'b-autonomie', min: 0, max: 1000, step: 10, inputmode: 'numeric', value: prefs.autonomieKm || '', placeholder: 'désactivée' });
+  const niveau = h('select', { id: 'b-reservoir' }, [[1, 'Plein'], [0.75, '3/4'], [0.5, 'Moitié'], [0.25, '1/4']].map(([v, n]) => h('option', { value: String(v), selected: Number(prefs.reservoir) === v }, n)));
+  const aideAutonomie = h('p', { class: 'muted petit' });
+  const blocAutonomie = h('div', { class: 'groupe-autonomie' },
+    h('label', { for: 'b-autonomie' }, 'Autonomie du réservoir (km)'), autonomie,
+    h('label', { for: 'b-reservoir' }, 'Niveau au départ'), niveau, aideAutonomie);
   // Météo (inactive tant que METEO_BRANCHEE est faux) : éviter pluie, vent fort et froid ressenti, aux seuils du Compte, à l'heure de passage.
   const meteo = h('input', { type: 'checkbox', id: 'b-meteo', checked: prefs.meteo });
   const departA = h('input', { type: 'datetime-local', id: 'b-depart-a', value: prefs.departA });
@@ -135,7 +143,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
   const contraintes = h('details', { class: 'reglages' },
     h('summary', {}, icone('reglages', 18), 'Éviter', resumeContraintes),
     h('div', { class: 'contenu' }, EVITEMENTS.map(([v, n]) => h('label', { class: 'case' }, cases[v], n)),
-      blocMeteo,
+      blocMeteo, blocAutonomie,
       h('p', { class: 'muted petit' }, METEO_BRANCHEE ? 'Étapes et autonomie arrivent dans une prochaine version.' : 'Étapes, autonomie et météo arrivent dans une prochaine version.')));
 
   const msg = h('div', { 'aria-live': 'polite' });
@@ -159,6 +167,9 @@ export function vueBalade(racine, { params, id: idBalade }) {
     prefs.sinuosite = Number(sinuosite.value); prefs.scenique = Number(scenique.value); prefs.motard = Number(motard.value);
     prefs.decouverte = decouverte.checked && estAbonne(); prefs.intensite = Number(intensite.value);
     prefs.evitements = EVITEMENTS.map(([v]) => v).filter((v) => cases[v].checked);
+    prefs.autonomieKm = Math.min(1000, Math.max(0, Math.round(Number(autonomie.value) || 0))); prefs.reservoir = Number(niveau.value) || 1;
+    autonomie.disabled = niveau.disabled = !estAbonne();
+    aideAutonomie.textContent = !estAbonne() ? 'Réservé aux abonnés : des stations sont insérées quand la balade dépasse votre autonomie.' : prefs.autonomieKm >= 30 ? 'Des stations proches de la balade seront insérées si elle dépasse l\'autonomie.' : prefs.autonomieKm > 0 ? 'Autonomie : 30 km au moins.' : '';
     prefs.meteo = METEO_BRANCHEE && meteo.checked; prefs.departA = METEO_BRANCHEE ? departA.value : '';
     ecrirePrefs(prefs);
     sortieDuree.textContent = fmtDuree(prefs.duree); sortieDistance.textContent = fmtKm(prefs.distance);
@@ -189,7 +200,8 @@ export function vueBalade(racine, { params, id: idBalade }) {
     majReglages();
   });
   for (const el of [typeSegments, modeSegments, decouverte, ...Object.values(cases)]) el.addEventListener('change', majReglages);
-  for (const el of [duree, distance, sinuosite, scenique, motard, intensite]) el.addEventListener('input', majReglages);
+  for (const el of [duree, distance, sinuosite, scenique, motard, intensite, autonomie]) el.addEventListener('input', majReglages);
+  niveau.addEventListener('change', majReglages);
 
   // --- Carte : points
   function dessinerPoint(cible, p) {
@@ -309,6 +321,17 @@ export function vueBalade(racine, { params, id: idBalade }) {
     }
     return corps;
   }
+  /** Stations proches du départ, de l'arrivée et des étapes (route PHP des arrêts carburant, abonnés) : 50 km chacun, 500 au plus, les moins chères d'abord. */
+  async function chargerStations() {
+    const centres = [depart, ...etapes, ...(prefs.retour ? [] : [arrivee])].filter(Boolean).slice(0, 4);
+    const vues = new Map();
+    for (const [lat, lon] of centres) {
+      const r = await get('/api/ravitaillement', { lat, lon, rayon: 50, carburant: 'sp95', litres: 15, conso: 5 });
+      for (const s of r.stations || []) if (!vues.has(s.id)) vues.set(s.id, s);
+    }
+    return [...vues.values()].sort((a, b) => (a.prix_litre ?? 99) - (b.prix_litre ?? 99)).slice(0, 500)
+      .map((s) => ({ lat: s.lat, lon: s.lon, nom: [s.marque, s.nom || s.ville].filter(Boolean).join(' · ').slice(0, 80) || undefined, prix: s.prix_litre ?? undefined }));
+  }
   async function lancer({ variante = 0 } = {}) {
     if (!depart) { toast('info', 'Choisissez d\'abord un point de départ.'); return; }
     if (!prefs.retour && !arrivee) { toast('info', 'Choisissez l\'arrivée sur la carte.'); return; }
@@ -328,6 +351,13 @@ export function vueBalade(racine, { params, id: idBalade }) {
         try { await chargerConnus(); } catch (e) { if (e.abonnementRequis) throw e; /* sans la liste : calcul sans pénalité, signalé plus bas */ }
       }
       const corps = requete(variante);
+      if (estAbonne() && prefs.autonomieKm >= 30) {
+        try {
+          const stations = await chargerStations();
+          if (stations.length) { corps.autonomie = { km: prefs.autonomieKm, reservoir: prefs.reservoir }; corps.stations = stations; }
+          else avisAutonomie = 'Aucune station connue près de ce point : l\'autonomie n\'a pas été prise en compte.';
+        } catch (e) { avisAutonomie = 'Les stations n\'ont pas pu être lues : l\'autonomie n\'a pas été prise en compte.'; }
+      }
       const r = await appelerRaido(j.raidoUrl, prefs.retour ? '/v1/balade' : '/v1/trajet', corps, j.valeur);
       if (moi !== compteur) return;
       const avis = [];
@@ -339,6 +369,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
           if (r.graphe?.version && connus.graphe && r.graphe.version !== connus.graphe) avis.push('Vos trajets ont été rattachés à une autre version de la carte : la découverte peut être approximative jusqu\'à la prochaine synchronisation.');
         }
       }
+      if (avisAutonomie) { avis.push(avisAutonomie); avisAutonomie = null; }
       resultat = { ...r, avertissements: [...(r.avertissements || []), ...avis], requete: corps, points: decoderPolyligne(r.trace), type };
       afficherResultat();
     } catch (e) {
@@ -367,10 +398,16 @@ export function vueBalade(racine, { params, id: idBalade }) {
     if (resultat.requete.distance_km) { const d = resultat.distance_m / 1000 - resultat.requete.distance_km; return `${d >= 0 ? '+' : '−'}${fmtKm(Math.abs(d))} par rapport à la distance demandée`; }
     return null;
   }
+  /** Ce qui est gardé avec la balade : sans la liste des stations (500 lignes) ni l'historique des tronçons parcourus (donnée personnelle, volumineuse). */
+  function parametresEnregistres(q) { const { stations, troncons_connus: connusEnvoyes, ...reste } = q; return reste; }
   function afficherResultat() {
     if (etapes.length) redessinerEtapes(); // distances au passage de chaque étape
     const r = resultat;
     dessinerTrace(r.points);
+    for (const m of reperesStations) m.remove();
+    reperesStations = carte ? (r.stations || []).map((s) => marqueur(carte, [s.lat, s.lon], `Plein : ${s.nom || 'station'}`, '#16a34a')) : [];
+    const pleins = (r.stations || []).length ? h('ul', { class: 'liste pleins' }, r.stations.map((s) => h('li', {}, icone('epingle', 16),
+      h('span', {}, h('strong', {}, `Plein à ${fmtKm(s.distance_m / 1000)}`), s.nom ? ` · ${s.nom}` : '', Number.isFinite(s.prix) ? h('span', { class: 'mono' }, ` · ${s.prix.toFixed(3).replace('.', ',')} €/L`) : null)))) : null;
     const arriveeA = fmtHeure(new Date(Date.now() + r.duree_s * 1000).toISOString());
     const chiffres = h('div', { class: 'chiffres' },
       chiffre(fmtKm(r.distance_m / 1000), 'distance'), chiffre(fmtDuree(r.duree_s / 60), 'durée, pauses comprises'), chiffre(arriveeA, 'arrivée si départ maintenant'));
@@ -401,7 +438,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
       f.addEventListener('submit', async (ev) => {
         ev.preventDefault(); ok.disabled = true;
         try {
-          const s = await post('/api/balades', { titre: titre.value.trim() || (r.passe_par ? suggestion : ''), params: r.requete, trace: r.trace, distance_m: r.distance_m, duree_s: r.duree_s, scores: r.scores ? { ...r.scores, ...(r.denivele_m != null ? { denivele_m: r.denivele_m } : {}) } : null, graphe_version: r.graphe?.version ?? null });
+          const s = await post('/api/balades', { titre: titre.value.trim() || (r.passe_par ? suggestion : ''), params: parametresEnregistres(r.requete), trace: r.trace, distance_m: r.distance_m, duree_s: r.duree_s, scores: r.scores ? { ...r.scores, ...(r.denivele_m != null ? { denivele_m: r.denivele_m } : {}) } : null, graphe_version: r.graphe?.version ?? null });
           enregistree = { id: s.id, titre: s.titre, partagee: false };
           toast('ok', `« ${s.titre} » enregistrée.`);
           afficherResultat(); chargerBalades();
@@ -428,7 +465,7 @@ export function vueBalade(racine, { params, id: idBalade }) {
     });
     zoneResultat.replaceChildren(
       h('div', { class: 'detail' }, h('h2', {}, enregistree?.titre || (r.requete.retour ? 'Votre boucle' : 'Votre trajet')), r.passe_par ? h('p', { class: 'passe-par' }, icone('epingle', 16), `Passe par ${r.passe_par}`) : null, ecart() ? h('p', { class: 'quand' }, ecart()) : null),
-      chiffres, scores,
+      chiffres, scores, pleins,
       ...(r.avertissements || []).map((a) => bandeau('info', a)), // déployée : replaceChildren n'aplatit pas les tableaux
       h('div', { class: 'actions-balade' }, autre, inverser, enregistrer, partager, gpxBtn, ouvrir),
       zonePartage,
