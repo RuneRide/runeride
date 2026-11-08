@@ -80,8 +80,11 @@ final class TronconMatcher
                     $out['en_attente'] = count($pending) - $i;
                     return $out;
                 }
-                $this->troncons->replaceForTrip($uid, $tripId, $list, $version);
-                $this->troncons->markMatched($tripId, $version, (float) ($d['couverture'] ?? 0), (int) ($d['points'] ?? 0));
+                // troncons_publics : absent d'un moteur plus ancien ; le trajet reste alors à rapparier (publics = 0)
+                $hasPublics = is_array($d['troncons_publics'] ?? null);
+                $publics = $hasPublics ? array_values(array_filter($d['troncons_publics'], static fn ($t) => is_array($t) && count($t) === 2 && is_int($t[0]) && is_int($t[1]))) : [];
+                $this->troncons->replaceForTrip($uid, $tripId, $list, $version, $publics);
+                $this->troncons->markMatched($tripId, $version, (float) ($d['couverture'] ?? 0), (int) ($d['points'] ?? 0), $hasPublics);
                 $out['apparies']++;
             } elseif ($r->status === 422) {
                 $this->troncons->markMatched($tripId, null, 0.0, count($path)); // tracé inapparentable : on ne réessaie pas

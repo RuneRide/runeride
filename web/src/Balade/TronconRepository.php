@@ -18,19 +18,21 @@ final class TronconRepository
     /**
      * Remplace les tronçons d'un trajet du compte ; rend le nombre rangé, ou null si le trajet n'est pas au compte.
      * @param list<array{0:int,1:int}> $troncons
+     * @param list<array{0:int,1:int}> $publics ceux de $troncons parcourus hors des 500 premiers et derniers mètres (candidats au score communautaire)
      */
-    public function replaceForTrip(int $userId, int $tripId, array $troncons, string $graphVersion): ?int
+    public function replaceForTrip(int $userId, int $tripId, array $troncons, string $graphVersion, array $publics = []): ?int
     {
         $own = $this->db->createQueryBuilder()->select('1')->from('trips')
             ->where('id = :t', 'user_id = :u')->setParameter('t', $tripId)->setParameter('u', $userId)->executeQuery()->fetchOne();
         if ($own === false) {
             return null;
         }
-        $this->db->transactional(function () use ($tripId, $troncons, $graphVersion): void {
+        $publicSet = array_flip(array_map(static fn (array $t) => $t[0] . ':' . $t[1], $publics));
+        $this->db->transactional(function () use ($tripId, $troncons, $graphVersion, $publicSet): void {
             $this->db->delete('trajets_troncons', ['trip_id' => $tripId]);
             foreach (array_unique(array_map(static fn (array $t) => $t[0] . ':' . $t[1], $troncons)) as $k) {
                 [$way, $seg] = explode(':', $k);
-                $this->db->insert('trajets_troncons', ['trip_id' => $tripId, 'way_id' => (int) $way, 'segment' => (int) $seg, 'graph_version' => $graphVersion]);
+                $this->db->insert('trajets_troncons', ['trip_id' => $tripId, 'way_id' => (int) $way, 'segment' => (int) $seg, 'graph_version' => $graphVersion, 'publique' => isset($publicSet[$k]) ? 1 : 0]);
             }
         });
         return $this->countForTrip($tripId);
@@ -77,23 +79,46 @@ final class TronconRepository
     }
 
     /**
-     * Trajets appariés sur une autre version de graphe que $currentVersion (le plus récent d'abord), au plus $limit : à rapparier,
-     * car les identifiants de tronçons ne valent que pour la version qui les a produits. Les inapparentables (version nulle) ne reviennent pas.
+     * Trajets appariés sur une autre version de graphe que $currentVersion, ou sans la liste des tronçons publics (le plus récent d'abord),
+     * au plus $limit : à rapparier, car les identifiants de tronçons ne valent que pour la version qui les a produits. Les inapparentables
+     * (version nulle) ne reviennent pas.
      * @return list<int>
      */
     public function staleTrips(int $userId, string $currentVersion, int $limit): array
     {
         return array_map('intval', $this->db->fetchFirstColumn(
-            'SELECT t.id FROM trips t JOIN trajets_apparies a ON a.trip_id = t.id WHERE t.user_id = ? AND a.graph_version IS NOT NULL AND a.graph_version <> ? AND t.points_count > 2 ORDER BY t.started_at DESC, t.id DESC LIMIT ' . max(1, $limit),
+            'SELECT t.id FROM trips t JOIN trajets_apparies a ON a.trip_id = t.id WHERE t.user_id = ? AND a.graph_version IS NOT NULL AND (a.graph_version <> ? OR a.publics = 0) AND t.points_count > 2 ORDER BY t.started_at DESC, t.id DESC LIMIT ' . max(1, $limit),
             [$userId, $currentVersion],
         ));
     }
 
     /** Note qu'un trajet a été apparié (ou jugé inapparentable : couverture 0), pour ne pas le renvoyer à chaque synchronisation. */
-    public function markMatched(int $tripId, ?string $graphVersion, float $coverage, int $points): void
+    public function markMatched(int $tripId, ?string $graphVersion, float $coverage, int $points, bool $hasPublics = false): void
     {
         $this->db->executeStatement('DELETE FROM trajets_apparies WHERE trip_id = ?', [$tripId]);
-        $this->db->insert('trajets_apparies', ['trip_id' => $tripId, 'graph_version' => $graphVersion, 'couverture' => $coverage, 'points' => $points, 'matched_at' => Time::now()]);
+        $this->db->insert('trajets_apparies', ['trip_id' => $tripId, 'graph_version' => $graphVersion, 'couverture' => $coverage, 'points' => $points, 'publics' => $hasPublics ? 1 : 0, 'matched_at' => Time::now()]);
+    }
+
+    /**
+     * Score communautaire : tronçons publics parcourus par au moins $minContributors comptes **distincts** ayant activé le partage
+     * (users.partage_traces), pour une version de graphe. Seul le nombre de comptes ressort : jamais lequel, ni quand, ni quel trajet.
+     * @return list<array{0:int,1:int,2:int}> [way, segment, nombre de comptes], triés
+     */
+    public function communityCounts(string $graphVersion, int $minContributors): array
+    {
+        $rows = $this->db->fetchAllNumeric(
+            'SELECT tt.way_id, tt.segment, COUNT(DISTINCT t.user_id) AS n FROM trajets_troncons tt JOIN trips t ON t.id = tt.trip_id JOIN users u ON u.id = t.user_id '
+            . 'WHERE tt.publique = 1 AND tt.graph_version = ? AND u.partage_traces = 1 GROUP BY tt.way_id, tt.segment HAVING COUNT(DISTINCT t.user_id) >= ? ORDER BY tt.way_id, tt.segment',
+            [$graphVersion, max(1, $minContributors)],
+        );
+        return array_map(static fn (array $r) => [(int) $r[0], (int) $r[1], (int) $r[2]], $rows);
+    }
+
+    /** Version de graphe la plus récente pour laquelle des tronçons publics existent, ou null. */
+    public function latestPublicVersion(): ?string
+    {
+        $v = $this->db->fetchOne('SELECT MAX(graph_version) FROM trajets_troncons WHERE publique = 1');
+        return $v === false || $v === null ? null : (string) $v;
     }
 
     /** Versions de graphe pour lesquelles le compte a des tronçons (la plus récente d'abord, par ordre lexicographique de date). */

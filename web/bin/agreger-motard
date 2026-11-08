@@ -1,0 +1,11 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+// Agrège le score communautaire « motard » : php bin/agreger-motard [sortie.json] [version-du-graphe]
+// À lancer chaque semaine (cron). Sortie par défaut : storage/motard.json (hors Git).
+require __DIR__ . '/../vendor/autoload.php';
+$db = RuneRide\Database::connect(RuneRide\Config::load(__DIR__ . '/../.env'));
+$sortie = $argv[1] ?? __DIR__ . '/../storage/motard.json';
+$agg = new RuneRide\Balade\MotardAggregator(new RuneRide\Balade\TronconRepository($db));
+$n = $agg->export($sortie, $argv[2] ?? null);
+echo "$n tronçon(s) publié(s) dans $sortie (au moins " . RuneRide\Balade\MotardAggregator::MIN_CONTRIBUTORS . " comptes distincts chacun)\n";
